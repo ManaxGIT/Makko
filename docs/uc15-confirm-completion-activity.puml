@@ -1,0 +1,54 @@
+@startuml
+!pragma layout smetana
+title UC15 – Xác nhận hoàn thành yêu cầu
+
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam activity {
+  BackgroundColor #EAF7EE
+  BorderColor #2E7D4F
+  DiamondBackgroundColor #FFF4D6
+  DiamondBorderColor #B7791F
+  FontColor #18392A
+  ArrowColor #3E6250
+}
+
+|Người đăng yêu cầu|
+start
+:Mở yêu cầu đã được giao;
+:Kiểm tra hàng hóa đã nhận và thông tin thanh toán;
+if (Có vấn đề cần xử lý?) then (Có)
+  :Chọn báo cáo vấn đề;
+  |Hệ thống|
+  :Chuyển người dùng tới chức năng báo cáo vấn đề;
+  :Giữ nguyên trạng thái DELIVERED;
+  stop
+else (Không)
+  |Người đăng yêu cầu|
+  :Chọn "Xác nhận hoàn thành";
+  :Xác nhận thao tác;
+endif
+
+|Hệ thống|
+:Kiểm tra trạng thái giao hàng, chi phí\nvà quyền xác nhận của người dùng;
+if (Đủ điều kiện hoàn thành?) then (Không)
+  :Thông báo điều kiện chưa được đáp ứng;
+  |Người đăng yêu cầu|
+  :Xem thông báo;
+  stop
+else (Có)
+  |Hệ thống|
+  :Chuyển trạng thái yêu cầu sang COMPLETED;
+  :Lưu người xác nhận và thời gian hoàn thành;
+  :Kết thúc quy trình giao dịch;
+  :Mở chức năng đánh giá cho hai bên;
+  :Gửi thông báo cho người nhận yêu cầu;
+endif
+
+|Người nhận yêu cầu|
+:Nhận thông báo yêu cầu đã hoàn thành;
+
+|Người đăng yêu cầu|
+:Xem kết quả hoàn thành và tùy chọn đánh giá;
+stop
+@enduml

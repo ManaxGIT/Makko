@@ -1,0 +1,44 @@
+@startuml
+!pragma layout smetana
+title UC24 – Xác nhận đã giao hàng
+
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam activity {
+  BackgroundColor #EAF7EE
+  BorderColor #2E7D4F
+  DiamondBackgroundColor #FFF4D6
+  DiamondBorderColor #B7791F
+  FontColor #18392A
+  ArrowColor #3E6250
+}
+
+|Người nhận yêu cầu|
+start
+:Mở yêu cầu đang giao;
+:Chọn "Xác nhận đã giao hàng";
+:Nhập ghi chú và tải ảnh minh chứng (nếu có);
+:Xác nhận thao tác;
+
+|Hệ thống|
+:Kiểm tra người thực hiện và\ntrạng thái hiện tại của yêu cầu;
+if (Có thể xác nhận giao hàng?) then (Không)
+  :Thông báo lý do không thể xác nhận;
+  |Người nhận yêu cầu|
+  :Xem thông báo;
+  stop
+else (Có)
+  |Hệ thống|
+  :Lưu thông tin giao hàng và thời gian xác nhận;
+  :Chuyển trạng thái yêu cầu sang DELIVERED;
+  :Ghi nhận lịch sử thay đổi trạng thái;
+  :Gửi thông báo cho người đăng yêu cầu;
+endif
+
+|Người đăng yêu cầu|
+:Nhận thông báo đơn hàng đã được giao;
+
+|Người nhận yêu cầu|
+:Xem trạng thái đã giao hàng;
+stop
+@enduml

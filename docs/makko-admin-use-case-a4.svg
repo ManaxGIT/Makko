@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="794" height="700" viewBox="0 0 794 700">
+  <defs>
+    <style>
+      .title { font: 700 18px Arial, sans-serif; fill: #172033; letter-spacing: .4px; }
+      .boundary-title { font: 700 15px Arial, sans-serif; fill: #28354d; }
+      .actor-label { font: 600 13px Arial, sans-serif; fill: #7c2d12; text-anchor: middle; }
+      .uc-text { font: 12.5px Arial, sans-serif; fill: #422006; text-anchor: middle; dominant-baseline: middle; }
+      .association { fill: none; stroke: #68758a; stroke-width: 1.4; stroke-linecap: round; }
+      .actor { fill: #fff; stroke: #9a3412; stroke-width: 1.7; }
+      .uc { fill: #fff8f1; stroke: #c35c21; stroke-width: 1.4; }
+    </style>
+  </defs>
+  <rect width="794" height="700" fill="#fff"/>
+  <text class="title" x="397" y="32" text-anchor="middle">USE CASE CỦA QUẢN TRỊ VIÊN</text>
+  <rect x="190" y="62" width="576" height="596" rx="3" fill="#fff" stroke="#475569" stroke-width="1.5"/>
+  <rect x="190" y="62" width="576" height="34" fill="#fffaf5" stroke="#475569" stroke-width="1.5"/>
+  <text class="boundary-title" x="478" y="84" text-anchor="middle">HỆ THỐNG MAKKO</text>
+
+  <path class="association" d="M111 322 C168 259 224 151 296 151"/>
+  <path class="association" d="M115 330 C184 292 230 251 296 251"/>
+  <path class="association" d="M116 339 C184 341 231 351 296 351"/>
+  <path class="association" d="M115 348 C181 389 232 451 296 451"/>
+  <path class="association" d="M111 357 C164 432 224 551 296 551"/>
+
+  <g transform="translate(82 312)">
+    <circle class="actor" cx="0" cy="0" r="10"/>
+    <line class="actor" x1="0" y1="10" x2="0" y2="39"/>
+    <line class="actor" x1="-19" y1="21" x2="19" y2="21"/>
+    <line class="actor" x1="0" y1="39" x2="-17" y2="61"/>
+    <line class="actor" x1="0" y1="39" x2="17" y2="61"/>
+  </g>
+  <text class="actor-label" x="82" y="397">Quản trị viên</text>
+
+  <ellipse class="uc" cx="430" cy="151" rx="134" ry="32"/>
+  <text class="uc-text" x="430" y="151">UC02 – Đăng nhập</text>
+  <ellipse class="uc" cx="430" cy="251" rx="134" ry="32"/>
+  <text class="uc-text" x="430" y="251">UC26 – Quản lý người dùng</text>
+  <ellipse class="uc" cx="430" cy="351" rx="134" ry="32"/>
+  <text class="uc-text" x="430" y="351"><tspan x="430" dy="-7">UC27 – Giám sát</tspan><tspan x="430" dy="16">yêu cầu đi chợ</tspan></text>
+  <ellipse class="uc" cx="430" cy="451" rx="134" ry="32"/>
+  <text class="uc-text" x="430" y="451">UC28 – Xử lý phản ánh</text>
+  <ellipse class="uc" cx="430" cy="551" rx="134" ry="32"/>
+  <text class="uc-text" x="430" y="551"><tspan x="430" dy="-7">UC29 – Xem báo cáo</tspan><tspan x="430" dy="16">và thống kê</tspan></text>
+</svg>
+

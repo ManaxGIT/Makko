@@ -1,0 +1,78 @@
+@startuml
+!pragma layout smetana
+title ACTIVITY DIAGRAM – NHẬN THỰC HIỆN YÊU CẦU (UC19)
+
+skinparam dpi 180
+skinparam shadowing false
+skinparam backgroundColor #FFFFFF
+skinparam activity {
+  BackgroundColor #F3FBF7
+  BorderColor #2F8065
+  FontColor #172033
+  DiamondBackgroundColor #FFF7E8
+  DiamondBorderColor #C17A1B
+  StartColor #28775D
+  EndColor #28775D
+  BarColor #64748B
+}
+skinparam partition {
+  BorderColor #94A3B8
+  FontColor #24324A
+  BackgroundColor #FBFCFE
+}
+skinparam ArrowColor #64748B
+skinparam ArrowThickness 1.2
+
+|Người nhận yêu cầu|
+start
+:Chọn chức năng\n"Nhận thực hiện yêu cầu";
+
+|Hệ thống|
+:Hiển thị thông tin tóm tắt\nvà yêu cầu xác nhận;
+
+|Người nhận yêu cầu|
+if (Xác nhận nhận yêu cầu?) then (Không)
+  :Hủy thao tác nhận;
+  stop
+else (Có)
+  :Gửi xác nhận nhận yêu cầu;
+endif
+
+|Hệ thống|
+:Kiểm tra tài khoản đang hoạt động\nvà người nhận không phải người đăng;
+
+if (Đủ điều kiện nhận?) then (Không)
+  |Hệ thống|
+  :Thông báo không thể nhận yêu cầu;
+  |Người nhận yêu cầu|
+  :Xem lý do từ chối;
+  stop
+else (Có)
+  |Hệ thống|
+  :Khóa bản ghi và kiểm tra lại trạng thái\ntrong một giao dịch nguyên tử;
+endif
+
+|Hệ thống|
+if (Yêu cầu còn PENDING?) then (Không)
+  |Hệ thống|
+  :Hủy giao dịch và thông báo yêu cầu\nđã được người khác nhận;
+  |Người nhận yêu cầu|
+  :Quay lại danh sách tìm kiếm;
+  stop
+else (Có)
+  |Hệ thống|
+  :Gán người nhận cho yêu cầu;
+  :Chuyển trạng thái từ PENDING\nsang ACCEPTED;
+  :Lưu lịch sử trạng thái và\nloại yêu cầu khỏi danh sách chờ nhận;
+  :Tạo cuộc trao đổi cho hai bên;
+  :Gửi thông báo đến người đăng;
+endif
+
+|Người đăng yêu cầu|
+:Nhận thông báo yêu cầu\nđã có người thực hiện;
+
+|Người nhận yêu cầu|
+:Nhận thông báo thành công và xem yêu cầu\ntrong danh sách "Yêu cầu đã nhận";
+stop
+
+@enduml

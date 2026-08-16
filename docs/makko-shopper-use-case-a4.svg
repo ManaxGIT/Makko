@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="794" height="1123" viewBox="0 0 794 1123">
+  <defs>
+    <style>
+      .title { font: 700 18px Arial, sans-serif; fill: #172033; letter-spacing: .35px; }
+      .boundary-title { font: 700 15px Arial, sans-serif; fill: #28354d; }
+      .actor-label { font: 600 13px Arial, sans-serif; fill: #28775d; text-anchor: middle; }
+      .uc-text { font: 12.5px Arial, sans-serif; fill: #172033; text-anchor: middle; dominant-baseline: middle; }
+      .association { fill: none; stroke: #6b778c; stroke-width: 1.35; stroke-linecap: round; }
+      .actor { fill: #fff; stroke: #28775d; stroke-width: 1.7; }
+      .uc { fill: #f1fbf7; stroke: #28775d; stroke-width: 1.4; }
+    </style>
+  </defs>
+  <rect width="794" height="1123" fill="#fff"/>
+  <text class="title" x="397" y="31" text-anchor="middle">USE CASE CỦA NGƯỜI NHẬN YÊU CẦU</text>
+  <rect x="188" y="60" width="578" height="1028" rx="3" fill="#fff" stroke="#475569" stroke-width="1.5"/>
+  <rect x="188" y="60" width="578" height="35" fill="#f8fafc" stroke="#475569" stroke-width="1.5"/>
+  <text class="boundary-title" x="477" y="83" text-anchor="middle">HỆ THỐNG MAKKO</text>
+
+  <path class="association" d="M120 477 C180 477 205 130 260 130"/>
+  <path class="association" d="M120 484 C210 484 300 215 460 215"/>
+  <path class="association" d="M120 491 C180 491 205 300 260 300"/>
+  <path class="association" d="M120 498 C210 498 300 385 460 385"/>
+  <path class="association" d="M120 505 C180 505 205 470 260 470"/>
+  <path class="association" d="M120 512 C210 512 300 555 460 555"/>
+  <path class="association" d="M120 519 C180 519 205 640 260 640"/>
+  <path class="association" d="M120 526 C210 526 300 725 460 725"/>
+  <path class="association" d="M120 533 C180 533 205 810 260 810"/>
+  <path class="association" d="M120 540 C210 540 300 895 460 895"/>
+  <path class="association" d="M120 547 C180 547 205 980 260 980"/>
+
+  <g transform="translate(90 495)">
+    <circle class="actor" cx="0" cy="0" r="11"/>
+    <line class="actor" x1="0" y1="11" x2="0" y2="43"/>
+    <line class="actor" x1="-21" y1="23" x2="21" y2="23"/>
+    <line class="actor" x1="0" y1="43" x2="-19" y2="68"/>
+    <line class="actor" x1="0" y1="43" x2="19" y2="68"/>
+  </g>
+  <text class="actor-label" x="90" y="586"><tspan x="90" dy="-7">Người nhận</tspan><tspan x="90" dy="16">yêu cầu</tspan></text>
+
+  <ellipse class="uc" cx="370" cy="130" rx="110" ry="32"/>
+  <text class="uc-text" x="370" y="130">UC18 – Tìm kiếm yêu cầu</text>
+
+  <ellipse class="uc" cx="570" cy="215" rx="110" ry="32"/>
+  <text class="uc-text" x="570" y="215">UC09 – Xem chi tiết yêu cầu</text>
+
+  <ellipse class="uc" cx="370" cy="300" rx="110" ry="32"/>
+  <text class="uc-text" x="370" y="300">UC19 – Nhận thực hiện yêu cầu</text>
+
+  <ellipse class="uc" cx="570" cy="385" rx="110" ry="32"/>
+  <text class="uc-text" x="570" y="385"><tspan x="570" dy="-7">UC20 – Xem danh sách</tspan><tspan x="570" dy="16">yêu cầu đã nhận</tspan></text>
+
+  <ellipse class="uc" cx="370" cy="470" rx="110" ry="32"/>
+  <text class="uc-text" x="370" y="470">UC21 – Cập nhật trạng thái</text>
+
+  <ellipse class="uc" cx="570" cy="555" rx="110" ry="32"/>
+  <text class="uc-text" x="570" y="555"><tspan x="570" dy="-7">UC22 – Cập nhật mặt hàng</tspan><tspan x="570" dy="16">đã mua</tspan></text>
+
+  <ellipse class="uc" cx="370" cy="640" rx="110" ry="32"/>
+  <text class="uc-text" x="370" y="640"><tspan x="370" dy="-7">UC23 – Cung cấp hóa đơn</tspan><tspan x="370" dy="16">và chi phí</tspan></text>
+
+  <ellipse class="uc" cx="570" cy="725" rx="110" ry="32"/>
+  <text class="uc-text" x="570" y="725">UC13 – Trao đổi thông tin</text>
+
+  <ellipse class="uc" cx="370" cy="810" rx="110" ry="32"/>
+  <text class="uc-text" x="370" y="810">UC24 – Xác nhận đã giao hàng</text>
+
+  <ellipse class="uc" cx="570" cy="895" rx="110" ry="32"/>
+  <text class="uc-text" x="570" y="895">UC25 – Đánh giá người đăng</text>
+
+  <ellipse class="uc" cx="370" cy="980" rx="110" ry="32"/>
+  <text class="uc-text" x="370" y="980">UC17 – Gửi phản ánh</text>
+</svg>
+

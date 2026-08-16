@@ -1,0 +1,56 @@
+@startuml
+!pragma layout smetana
+title UC28 – Xử lý báo cáo vấn đề
+
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam activity {
+  BackgroundColor #EAF7EE
+  BorderColor #2E7D4F
+  DiamondBackgroundColor #FFF4D6
+  DiamondBorderColor #B7791F
+  FontColor #18392A
+  ArrowColor #3E6250
+}
+
+|Quản trị viên|
+start
+:Mở danh sách báo cáo;
+:Chọn một báo cáo chờ xử lý;
+
+|Hệ thống|
+:Hiển thị nội dung báo cáo, yêu cầu liên quan,\nbằng chứng và lịch sử giao dịch;
+
+|Quản trị viên|
+:Kiểm tra thông tin và bằng chứng;
+if (Cần bổ sung thông tin?) then (Có)
+  :Gửi yêu cầu bổ sung thông tin;
+  |Hệ thống|
+  :Chuyển báo cáo sang trạng thái chờ bổ sung;
+  :Thông báo cho người liên quan;
+  |Người dùng liên quan|
+  :Nhận yêu cầu và cung cấp thông tin bổ sung;
+  |Hệ thống|
+  :Lưu thông tin bổ sung;
+  |Quản trị viên|
+  :Xem lại hồ sơ báo cáo;
+else (Không)
+endif
+
+|Quản trị viên|
+:Đưa ra kết luận và biện pháp xử lý;
+:Xác nhận kết quả xử lý;
+
+|Hệ thống|
+:Lưu kết luận và người xử lý;
+:Cập nhật trạng thái báo cáo thành đã xử lý;
+:Áp dụng biện pháp đã được phê duyệt;
+:Gửi kết quả cho các bên liên quan;
+
+|Người dùng liên quan|
+:Nhận kết quả xử lý báo cáo;
+
+|Quản trị viên|
+:Xem trạng thái báo cáo đã xử lý;
+stop
+@enduml

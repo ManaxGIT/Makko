@@ -1,0 +1,60 @@
+@startuml
+!pragma layout smetana
+title UC14 – Xác nhận chi phí và thanh toán
+
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam activity {
+  BackgroundColor #EAF7EE
+  BorderColor #2E7D4F
+  DiamondBackgroundColor #FFF4D6
+  DiamondBorderColor #B7791F
+  FontColor #18392A
+  ArrowColor #3E6250
+}
+
+|Người đăng yêu cầu|
+start
+:Mở yêu cầu đang chờ xác nhận chi phí;
+
+|Hệ thống|
+:Hiển thị danh sách mặt hàng, hóa đơn,\nphí dịch vụ và tổng chi phí;
+
+|Người đăng yêu cầu|
+:Kiểm tra hóa đơn và các khoản chi phí;
+if (Đồng ý với chi phí?) then (Không)
+  :Nhập nội dung cần làm rõ hoặc điều chỉnh;
+  :Gửi phản hồi;
+  |Hệ thống|
+  :Lưu phản hồi và giữ trạng thái chờ xác nhận;
+  :Thông báo cho người nhận yêu cầu;
+  |Người nhận yêu cầu|
+  :Nhận yêu cầu kiểm tra lại chi phí;
+  stop
+else (Có)
+  |Người đăng yêu cầu|
+  :Xác nhận tổng chi phí;
+  :Chọn phương thức thanh toán;
+endif
+
+|Hệ thống|
+:Kiểm tra thông tin thanh toán;
+if (Thông tin hợp lệ?) then (Không)
+  :Thông báo lỗi thanh toán;
+  |Người đăng yêu cầu|
+  :Xem thông báo và chọn lại phương thức;
+  stop
+else (Có)
+  |Hệ thống|
+  :Ghi nhận chi phí đã được xác nhận;
+  :Lưu phương thức và trạng thái thanh toán;
+  :Gửi thông báo cho người nhận yêu cầu;
+endif
+
+|Người nhận yêu cầu|
+:Nhận thông báo chi phí đã được xác nhận;
+
+|Người đăng yêu cầu|
+:Xem kết quả xác nhận và thanh toán;
+stop
+@enduml
