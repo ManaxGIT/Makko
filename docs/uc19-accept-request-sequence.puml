@@ -1,0 +1,46 @@
+@startuml
+title UC19 – Nhận yêu cầu đi chợ
+autonumber
+
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam sequence {
+  ArrowColor #3E6250
+  ActorBorderColor #2E7D4F
+  ActorFontColor #18392A
+  LifeLineBorderColor #5E806C
+  LifeLineBackgroundColor #F7FBF8
+  ParticipantBorderColor #2E7D4F
+  ParticipantBackgroundColor #EAF7EE
+  ParticipantFontColor #18392A
+  GroupBorderColor #B7791F
+  GroupHeaderBackgroundColor #FFF4D6
+}
+
+actor "Người nhận yêu cầu" as Shopper
+boundary "Giao diện ứng dụng" as UI
+control "REST API\nPython + FastAPI" as RequestService
+database "Cơ sở dữ liệu" as DB
+control "Dịch vụ thông báo" as NotificationService
+actor "Người đăng yêu cầu" as Requester
+
+Shopper -> UI: Chọn nhận yêu cầu
+UI -> RequestService: Gửi yêu cầu nhận việc
+RequestService -> DB: Đọc yêu cầu và khóa bản ghi
+DB --> RequestService: Thông tin, trạng thái và người nhận hiện tại
+RequestService -> RequestService: Kiểm tra quyền và điều kiện nhận
+
+alt Không đủ điều kiện hoặc yêu cầu đã được nhận
+  RequestService -> DB: Giải phóng khóa bản ghi
+  RequestService --> UI: Trả về lý do không thể nhận
+  UI --> Shopper: Hiển thị thông báo
+else Có thể nhận yêu cầu
+  RequestService -> DB: Gán người nhận và chuyển sang ACCEPTED
+  DB --> RequestService: Xác nhận cập nhật thành công
+  RequestService -> NotificationService: Thông báo có người nhận yêu cầu
+  NotificationService --> Requester: Gửi thông báo
+  NotificationService --> RequestService: Xác nhận đã gửi
+  RequestService --> UI: Trả về yêu cầu đã nhận
+  UI --> Shopper: Hiển thị nhận yêu cầu thành công
+end
+@enduml

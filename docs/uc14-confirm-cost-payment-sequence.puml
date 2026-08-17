@@ -1,0 +1,73 @@
+@startuml
+title UC14 – Xác nhận chi phí và thanh toán
+autonumber
+
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam sequence {
+  ArrowColor #3E6250
+  ActorBorderColor #2E7D4F
+  ActorFontColor #18392A
+  LifeLineBorderColor #5E806C
+  LifeLineBackgroundColor #F7FBF8
+  ParticipantBorderColor #2E7D4F
+  ParticipantBackgroundColor #EAF7EE
+  ParticipantFontColor #18392A
+  GroupBorderColor #B7791F
+  GroupHeaderBackgroundColor #FFF4D6
+}
+
+actor "Người đăng yêu cầu" as Requester
+boundary "Giao diện ứng dụng" as UI
+control "REST API\nPython + FastAPI" as RequestService
+participant "Cổng thanh toán" as PaymentGateway
+database "Cơ sở dữ liệu" as DB
+control "Dịch vụ thông báo" as NotificationService
+actor "Người nhận yêu cầu" as Shopper
+
+Requester -> UI: Mở chức năng xác nhận chi phí
+UI -> RequestService: Yêu cầu hóa đơn và tổng chi phí
+RequestService -> DB: Truy vấn hóa đơn, mặt hàng và các khoản phí
+DB --> RequestService: Thông tin chi phí đang chờ xác nhận
+RequestService --> UI: Trả về chi tiết chi phí
+UI --> Requester: Hiển thị hóa đơn và tổng thanh toán
+Requester -> UI: Chọn đồng ý hoặc yêu cầu điều chỉnh
+
+alt Yêu cầu điều chỉnh chi phí
+  Requester -> UI: Nhập nội dung cần làm rõ
+  UI -> RequestService: Gửi phản hồi về chi phí
+  RequestService -> DB: Lưu phản hồi và giữ trạng thái chờ xác nhận
+  DB --> RequestService: Xác nhận đã lưu
+  RequestService -> NotificationService: Thông báo yêu cầu kiểm tra lại chi phí
+  NotificationService --> Shopper: Gửi thông báo
+  RequestService --> UI: Trả về kết quả gửi phản hồi
+  UI --> Requester: Hiển thị đã gửi yêu cầu điều chỉnh
+else Đồng ý với chi phí
+  Requester -> UI: Chọn phương thức và xác nhận thanh toán
+  UI -> RequestService: Gửi xác nhận chi phí và phương thức thanh toán
+  RequestService -> RequestService: Kiểm tra trạng thái và số tiền
+
+  alt Thanh toán trực tuyến
+    RequestService -> PaymentGateway: Tạo giao dịch thanh toán
+    PaymentGateway --> RequestService: Trả về kết quả giao dịch
+    alt Thanh toán thất bại
+      RequestService --> UI: Trả về lỗi thanh toán
+      UI --> Requester: Hiển thị lỗi và cho phép thử lại
+    else Thanh toán thành công
+      RequestService -> DB: Lưu xác nhận chi phí và giao dịch thanh toán
+      DB --> RequestService: Xác nhận lưu thành công
+      RequestService -> NotificationService: Thông báo chi phí đã được xác nhận
+      NotificationService --> Shopper: Gửi thông báo
+      RequestService --> UI: Trả về kết quả thanh toán
+      UI --> Requester: Hiển thị thanh toán thành công
+    end
+  else Thanh toán trực tiếp
+    RequestService -> DB: Lưu xác nhận chi phí và phương thức trực tiếp
+    DB --> RequestService: Xác nhận lưu thành công
+    RequestService -> NotificationService: Thông báo chi phí đã được xác nhận
+    NotificationService --> Shopper: Gửi thông báo
+    RequestService --> UI: Trả về kết quả xác nhận
+    UI --> Requester: Hiển thị xác nhận chi phí thành công
+  end
+end
+@enduml

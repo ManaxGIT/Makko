@@ -1,0 +1,112 @@
+@startuml
+!pragma layout smetana
+title Kiến trúc tổng thể hệ thống Makko
+top to bottom direction
+
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam componentStyle rectangle
+skinparam linetype ortho
+skinparam ArrowColor #3E6250
+skinparam defaultTextAlignment center
+skinparam package {
+  BorderColor #5E806C
+  FontColor #18392A
+}
+skinparam component {
+  BackgroundColor #EAF7EE
+  BorderColor #2E7D4F
+  FontColor #18392A
+}
+skinparam database {
+  BackgroundColor #EDF3FF
+  BorderColor #496A9B
+  FontColor #243A5A
+}
+skinparam cloud {
+  BackgroundColor #FFF4D6
+  BorderColor #B7791F
+  FontColor #61420F
+}
+
+package "Nền tảng người dùng" as Platforms #F7FBF8 {
+  [Ứng dụng Android] as Android
+  [Ứng dụng iOS] as IOS
+  [Trình duyệt Web] as Web
+}
+
+package "Frontend – React Native + Expo + TypeScript" as Frontend #F7FBF8 {
+  [Expo Router\nĐiều hướng] as Router
+  [Giao diện và component\ndùng chung] as UI
+  [TanStack Query\nDữ liệu máy chủ] as Query
+  [Zustand\nTrạng thái cục bộ] as State
+  [REST API Client\nHTTPS · JSON · JWT] as APIClient
+  [Supabase Auth Client] as AuthClient
+  [Realtime Client] as RealtimeClient
+
+  Router --> UI
+  UI --> Query
+  UI --> State
+  Query --> APIClient
+}
+
+package "Backend REST API – Python + FastAPI" as Backend #F2F8F4 {
+  [API Endpoints\nFastAPI Router] as Endpoints
+  [Xác thực JWT và\nkiểm tra quyền] as Security
+  [Pydantic\nKiểm tra dữ liệu] as Validation
+  [Dịch vụ nghiệp vụ\nBusiness Services] as Services
+  [Lớp truy cập dữ liệu\nRepository] as Repository
+  [OpenAPI / Swagger\nTài liệu API] as OpenAPI
+
+  Endpoints --> Security
+  Endpoints --> Validation
+  Security --> Services
+  Validation --> Services
+  Services --> Repository
+  Endpoints --> OpenAPI
+}
+
+package "Nền tảng Supabase" as Supabase #F5F8FF {
+  [Supabase Auth\nTài khoản và phiên] as Auth
+  database "PostgreSQL\nDữ liệu nghiệp vụ · Transaction" as DB
+  [Supabase Storage\nẢnh và hóa đơn] as Storage
+  [Supabase Realtime\nChat và cập nhật tức thời] as Realtime
+}
+
+package "Dịch vụ bên ngoài" as External #FFFBF2 {
+  cloud "Dịch vụ bản đồ\nGoogle Maps / Mapbox" as Maps
+  cloud "Expo Push Notification" as Push
+  cloud "Cổng thanh toán" as Payment
+}
+
+Android --> Router
+IOS --> Router
+Web --> Router
+
+AuthClient --> Auth : đăng nhập / nhận JWT
+APIClient --> Endpoints : REST API\nHTTPS + JSON + JWT
+RealtimeClient --> Realtime : kết nối realtime
+
+Security --> Auth : xác minh JWT
+Repository --> DB : SQL / transaction
+Services --> Storage : ảnh / hóa đơn
+Services --> Maps : địa chỉ / khoảng cách
+Services --> Push : gửi thông báo
+Services --> Payment : xử lý thanh toán
+Realtime --> DB : theo dõi thay đổi
+
+note right of Endpoints
+  Frontend không truy cập trực tiếp
+  cơ sở dữ liệu cho nghiệp vụ chính.
+end note
+
+note right of Services
+  Các quy tắc tạo, nhận, cập nhật
+  và hoàn thành yêu cầu được xử lý tại đây.
+end note
+
+note right of DB
+  Transaction bảo vệ các thao tác đồng thời;
+  chính sách dữ liệu được áp dụng theo quyền.
+end note
+@enduml

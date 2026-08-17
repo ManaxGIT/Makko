@@ -1,0 +1,46 @@
+@startuml
+!pragma layout smetana
+title SƠ ĐỒ USE CASE QUẢN TRỊ HỆ THỐNG MAKKO
+
+left to right direction
+skinparam dpi 180
+skinparam pageMargin 16
+skinparam shadowing false
+skinparam linetype spline
+skinparam nodesep 30
+skinparam ranksep 36
+skinparam ArrowColor #475569
+skinparam ArrowThickness 1
+skinparam ActorBorderColor #9A3412
+skinparam ActorFontColor #7C2D12
+skinparam ActorFontSize 12
+skinparam UsecaseBorderColor #C2410C
+skinparam UsecaseBackgroundColor #FFFFFF
+skinparam UsecaseFontColor #7C2D12
+skinparam UsecaseFontSize 11
+skinparam RectangleBorderColor #64748B
+skinparam RectangleBackgroundColor #FFFCF8
+skinparam RectangleFontColor #0F172A
+
+actor "Quản trị viên" as Admin
+
+rectangle "HỆ THỐNG MAKKO" {
+  usecase "Đăng nhập trang\nquản trị" as AdminLogin
+  usecase "Quản lý người dùng" as ManageUsers
+  usecase "Giám sát yêu cầu\nđi chợ" as MonitorRequests
+  usecase "Xử lý phản ánh" as ResolveReports
+  usecase "Xem báo cáo\nvà thống kê" as ViewStatistics
+}
+
+Admin -- AdminLogin
+Admin -- ManageUsers
+Admin -- MonitorRequests
+Admin -- ResolveReports
+Admin -- ViewStatistics
+
+ManageUsers ..> AdminLogin : <<include>>
+MonitorRequests ..> AdminLogin : <<include>>
+ResolveReports ..> AdminLogin : <<include>>
+ViewStatistics ..> AdminLogin : <<include>>
+
+@enduml

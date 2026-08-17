@@ -1,0 +1,60 @@
+@startuml
+title UC23 – Cung cấp hóa đơn và chi phí
+autonumber
+
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam sequence {
+  ArrowColor #3E6250
+  ActorBorderColor #2E7D4F
+  ActorFontColor #18392A
+  LifeLineBorderColor #5E806C
+  LifeLineBackgroundColor #F7FBF8
+  ParticipantBorderColor #2E7D4F
+  ParticipantBackgroundColor #EAF7EE
+  ParticipantFontColor #18392A
+  GroupBorderColor #B7791F
+  GroupHeaderBackgroundColor #FFF4D6
+}
+
+actor "Người nhận yêu cầu" as Shopper
+boundary "Giao diện ứng dụng" as UI
+control "REST API\nPython + FastAPI" as RequestService
+participant "Dịch vụ lưu trữ" as StorageService
+database "Cơ sở dữ liệu" as DB
+control "Dịch vụ thông báo" as NotificationService
+actor "Người đăng yêu cầu" as Requester
+
+Shopper -> UI: Mở chức năng cung cấp hóa đơn và chi phí
+UI -> RequestService: Yêu cầu thông tin chi phí tạm tính
+RequestService -> DB: Truy vấn mặt hàng và chi phí
+DB --> RequestService: Danh sách mặt hàng và tổng tạm tính
+RequestService --> UI: Trả về thông tin mua hàng
+UI --> Shopper: Hiển thị hóa đơn và chi phí cần khai báo
+Shopper -> UI: Chọn ảnh hóa đơn, nhập chi phí phát sinh
+Shopper -> UI: Xác nhận gửi thông tin
+UI -> RequestService: Gửi dữ liệu chi phí và tệp hóa đơn
+RequestService -> RequestService: Kiểm tra dữ liệu chi phí
+
+alt Dữ liệu không hợp lệ
+  RequestService --> UI: Trả về nội dung cần bổ sung
+  UI --> Shopper: Hiển thị thông báo lỗi
+else Dữ liệu hợp lệ
+  RequestService -> StorageService: Tải lên ảnh hóa đơn
+  alt Tải ảnh thất bại
+    StorageService --> RequestService: Trả về lỗi lưu trữ
+    RequestService --> UI: Yêu cầu tải lại ảnh hóa đơn
+    UI --> Shopper: Hiển thị lỗi tải ảnh
+  else Tải ảnh thành công
+    StorageService --> RequestService: Trả về đường dẫn hóa đơn
+    RequestService -> RequestService: Tính tổng tiền hàng, phí dịch vụ\nvà chi phí phát sinh hợp lệ
+    RequestService -> DB: Lưu hóa đơn, chi phí và trạng thái chờ xác nhận
+    DB --> RequestService: Xác nhận lưu thành công
+    RequestService -> NotificationService: Thông báo có chi phí cần xác nhận
+    NotificationService --> Requester: Gửi thông báo
+    NotificationService --> RequestService: Xác nhận đã gửi
+    RequestService --> UI: Trả về tổng chi phí đã gửi
+    UI --> Shopper: Hiển thị trạng thái chờ xác nhận
+  end
+end
+@enduml

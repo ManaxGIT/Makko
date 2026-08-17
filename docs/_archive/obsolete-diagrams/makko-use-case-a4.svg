@@ -1,0 +1,140 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="794" height="1123" viewBox="0 0 794 1123">
+  <defs>
+    <style>
+      .title { font: 700 18px Arial, sans-serif; fill: #172033; letter-spacing: .4px; }
+      .boundary-title { font: 700 15px Arial, sans-serif; fill: #28354d; }
+      .actor-label { font: 600 13px Arial, sans-serif; fill: #1e3a5f; text-anchor: middle; }
+      .uc-text { font: 13px Arial, sans-serif; fill: #27233d; text-anchor: middle; dominant-baseline: middle; }
+      .section-label { font: 700 11px Arial, sans-serif; fill: #64748b; letter-spacing: .8px; }
+      .association { fill: none; stroke: #68758a; stroke-width: 1.35; stroke-linecap: round; }
+      .inheritance { fill: none; stroke: #94a3b8; stroke-width: 1.25; }
+      .actor-shape { fill: #fff; stroke: #315b85; stroke-width: 1.6; }
+      .uc-requester { fill: #f4f8ff; stroke: #4f7cac; stroke-width: 1.35; }
+      .uc-common { fill: #faf7ff; stroke: #8066b1; stroke-width: 1.35; }
+      .uc-shopper { fill: #f1fbf7; stroke: #3c8b6f; stroke-width: 1.35; }
+    </style>
+    <marker id="generalization" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="10" markerHeight="10" orient="auto-start-reverse">
+      <path d="M 1 1 L 11 6 L 1 11 Z" fill="#fff" stroke="#94a3b8" stroke-width="1.2"/>
+    </marker>
+  </defs>
+
+  <rect width="794" height="1123" fill="#ffffff"/>
+  <text class="title" x="397" y="32" text-anchor="middle">SƠ ĐỒ USE CASE – ACTOR CỦA HỆ THỐNG MAKKO</text>
+
+  <!-- System boundary -->
+  <rect x="188" y="62" width="578" height="1026" rx="3" fill="#ffffff" stroke="#475569" stroke-width="1.5"/>
+  <rect x="188" y="62" width="578" height="34" fill="#f8fafc" stroke="#475569" stroke-width="1.5"/>
+  <text class="boundary-title" x="477" y="84" text-anchor="middle">HỆ THỐNG MAKKO</text>
+
+  <text class="section-label" x="215" y="119">CHỨC NĂNG CỦA NGƯỜI ĐĂNG</text>
+  <text class="section-label" x="500" y="119">CHỨC NĂNG CHUNG</text>
+  <text class="section-label" x="215" y="754">CHỨC NĂNG CỦA NGƯỜI NHẬN</text>
+
+  <!-- Associations are drawn behind actors and use cases -->
+  <!-- Requester-specific associations -->
+  <path class="association" d="M111 196 C153 178 176 160 220 151"/>
+  <path class="association" d="M112 208 C156 212 177 226 220 231"/>
+  <path class="association" d="M109 220 C150 243 175 289 220 311"/>
+  <path class="association" d="M104 230 C143 279 170 363 220 391"/>
+
+  <!-- Common associations inherited through Người dùng -->
+  <path class="association" d="M111 545 C180 444 332 193 482 151"/>
+  <path class="association" d="M114 551 C202 472 351 278 482 231"/>
+  <path class="association" d="M116 558 C220 497 369 355 482 311"/>
+  <path class="association" d="M117 566 C237 541 368 436 482 431"/>
+  <path class="association" d="M117 574 C239 579 368 546 482 546"/>
+  <path class="association" d="M116 582 C225 622 363 654 482 661"/>
+  <path class="association" d="M113 590 C203 675 351 766 482 776"/>
+  <path class="association" d="M109 597 C176 727 334 878 482 891"/>
+
+  <!-- Shopper-specific associations -->
+  <path class="association" d="M109 928 C149 884 176 812 220 791"/>
+  <path class="association" d="M112 939 C155 915 179 886 220 871"/>
+  <path class="association" d="M112 951 C155 957 178 954 220 951"/>
+  <path class="association" d="M108 962 C149 998 176 1020 220 1031"/>
+
+  <!-- Actor inheritance -->
+  <path class="inheritance" d="M71 237 C55 332 55 438 71 525" marker-end="url(#generalization)"/>
+  <path class="inheritance" d="M71 917 C55 809 55 700 71 612" marker-end="url(#generalization)"/>
+
+  <!-- Requester actor -->
+  <g transform="translate(82 181)">
+    <circle class="actor-shape" cx="0" cy="0" r="10"/>
+    <line class="actor-shape" x1="0" y1="10" x2="0" y2="39"/>
+    <line class="actor-shape" x1="-19" y1="21" x2="19" y2="21"/>
+    <line class="actor-shape" x1="0" y1="39" x2="-17" y2="61"/>
+    <line class="actor-shape" x1="0" y1="39" x2="17" y2="61"/>
+  </g>
+  <text class="actor-label" x="82" y="260"><tspan x="82">Người đăng</tspan><tspan x="82" dy="16">yêu cầu</tspan></text>
+
+  <!-- General user actor -->
+  <g transform="translate(82 535)">
+    <circle class="actor-shape" cx="0" cy="0" r="10"/>
+    <line class="actor-shape" x1="0" y1="10" x2="0" y2="39"/>
+    <line class="actor-shape" x1="-19" y1="21" x2="19" y2="21"/>
+    <line class="actor-shape" x1="0" y1="39" x2="-17" y2="61"/>
+    <line class="actor-shape" x1="0" y1="39" x2="17" y2="61"/>
+  </g>
+  <text class="actor-label" x="82" y="618">Người dùng</text>
+
+  <!-- Shopper actor -->
+  <g transform="translate(82 922)">
+    <circle class="actor-shape" cx="0" cy="0" r="10"/>
+    <line class="actor-shape" x1="0" y1="10" x2="0" y2="39"/>
+    <line class="actor-shape" x1="-19" y1="21" x2="19" y2="21"/>
+    <line class="actor-shape" x1="0" y1="39" x2="-17" y2="61"/>
+    <line class="actor-shape" x1="0" y1="39" x2="17" y2="61"/>
+  </g>
+  <text class="actor-label" x="82" y="1005"><tspan x="82">Người nhận</tspan><tspan x="82" dy="16">yêu cầu</tspan></text>
+
+  <!-- Requester use cases -->
+  <ellipse class="uc-requester" cx="330" cy="151" rx="110" ry="30"/>
+  <text class="uc-text" x="330" y="151"><tspan x="330" dy="-7">Tạo yêu cầu</tspan><tspan x="330" dy="16">đi chợ</tspan></text>
+
+  <ellipse class="uc-requester" cx="330" cy="231" rx="110" ry="30"/>
+  <text class="uc-text" x="330" y="231"><tspan x="330" dy="-7">Quản lý yêu cầu</tspan><tspan x="330" dy="16">đã đăng</tspan></text>
+
+  <ellipse class="uc-requester" cx="330" cy="311" rx="110" ry="30"/>
+  <text class="uc-text" x="330" y="311">Theo dõi tiến trình</text>
+
+  <ellipse class="uc-requester" cx="330" cy="391" rx="110" ry="30"/>
+  <text class="uc-text" x="330" y="391">Xác nhận hoàn thành</text>
+
+  <!-- Common use cases -->
+  <ellipse class="uc-common" cx="590" cy="151" rx="108" ry="30"/>
+  <text class="uc-text" x="590" y="151">Quản lý tài khoản</text>
+
+  <ellipse class="uc-common" cx="590" cy="231" rx="108" ry="30"/>
+  <text class="uc-text" x="590" y="231">Xem thông báo</text>
+
+  <ellipse class="uc-common" cx="590" cy="311" rx="108" ry="30"/>
+  <text class="uc-text" x="590" y="311">Xem chi tiết yêu cầu</text>
+
+  <ellipse class="uc-common" cx="590" cy="431" rx="108" ry="30"/>
+  <text class="uc-text" x="590" y="431">Trao đổi thông tin</text>
+
+  <ellipse class="uc-common" cx="590" cy="546" rx="108" ry="32"/>
+  <text class="uc-text" x="590" y="546"><tspan x="590" dy="-7">Ghi nhận hóa đơn</tspan><tspan x="590" dy="16">và chi phí</tspan></text>
+
+  <ellipse class="uc-common" cx="590" cy="661" rx="108" ry="30"/>
+  <text class="uc-text" x="590" y="661">Ghi nhận thanh toán</text>
+
+  <ellipse class="uc-common" cx="590" cy="776" rx="108" ry="30"/>
+  <text class="uc-text" x="590" y="776">Đánh giá người dùng</text>
+
+  <ellipse class="uc-common" cx="590" cy="891" rx="108" ry="30"/>
+  <text class="uc-text" x="590" y="891">Báo cáo sự cố</text>
+
+  <!-- Shopper use cases -->
+  <ellipse class="uc-shopper" cx="330" cy="791" rx="110" ry="30"/>
+  <text class="uc-text" x="330" y="791">Tìm kiếm yêu cầu</text>
+
+  <ellipse class="uc-shopper" cx="330" cy="871" rx="110" ry="30"/>
+  <text class="uc-text" x="330" y="871">Nhận yêu cầu</text>
+
+  <ellipse class="uc-shopper" cx="330" cy="951" rx="110" ry="30"/>
+  <text class="uc-text" x="330" y="951">Thực hiện yêu cầu</text>
+
+  <ellipse class="uc-shopper" cx="330" cy="1031" rx="110" ry="30"/>
+  <text class="uc-text" x="330" y="1031">Cập nhật trạng thái</text>
+</svg>

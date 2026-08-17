@@ -1,0 +1,52 @@
+@startuml
+title UC21 – Cập nhật trạng thái thực hiện yêu cầu
+autonumber
+
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam sequence {
+  ArrowColor #3E6250
+  ActorBorderColor #2E7D4F
+  ActorFontColor #18392A
+  LifeLineBorderColor #5E806C
+  LifeLineBackgroundColor #F7FBF8
+  ParticipantBorderColor #2E7D4F
+  ParticipantBackgroundColor #EAF7EE
+  ParticipantFontColor #18392A
+  GroupBorderColor #B7791F
+  GroupHeaderBackgroundColor #FFF4D6
+}
+
+actor "Người nhận yêu cầu" as Shopper
+boundary "Giao diện ứng dụng" as UI
+control "REST API\nPython + FastAPI" as RequestService
+database "Cơ sở dữ liệu" as DB
+control "Dịch vụ thông báo" as NotificationService
+actor "Người đăng yêu cầu" as Requester
+
+Shopper -> UI: Mở chức năng cập nhật trạng thái
+UI -> RequestService: Yêu cầu trạng thái hiện tại
+RequestService -> DB: Truy vấn yêu cầu
+DB --> RequestService: Trạng thái và thông tin phân công
+RequestService --> UI: Trạng thái hiện tại và lựa chọn hợp lệ
+UI --> Shopper: Hiển thị các trạng thái kế tiếp
+Shopper -> UI: Chọn trạng thái và xác nhận
+UI -> RequestService: Gửi trạng thái mới và ghi chú
+RequestService -> DB: Kiểm tra lại trạng thái hiện tại
+DB --> RequestService: Trạng thái mới nhất
+RequestService -> RequestService: Kiểm tra quyền và quy tắc chuyển trạng thái
+
+alt Không được phép chuyển trạng thái
+  RequestService --> UI: Trả về lý do từ chối
+  UI --> Shopper: Hiển thị thông báo, giữ trạng thái cũ
+else Chuyển trạng thái hợp lệ
+  RequestService -> DB: Cập nhật trạng thái yêu cầu
+  RequestService -> DB: Lưu lịch sử trạng thái, người cập nhật, thời gian
+  DB --> RequestService: Xác nhận giao dịch thành công
+  RequestService -> NotificationService: Thông báo tiến độ mới
+  NotificationService --> Requester: Gửi thông báo
+  NotificationService --> RequestService: Xác nhận đã gửi
+  RequestService --> UI: Trả về trạng thái đã cập nhật
+  UI --> Shopper: Hiển thị kết quả thành công
+end
+@enduml
