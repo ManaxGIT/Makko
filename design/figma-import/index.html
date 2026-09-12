@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Makko — Mobile UI Kit</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="board">
+    <header class="board-head">
+      <div>
+        <p class="eyebrow">MAKKO · MOBILE PRODUCT</p>
+        <h1>Đi chợ giúp nhau,<br><em>gần nhà hơn.</em></h1>
+      </div>
+      <div class="brand-note">
+        <span class="logo-mark">m</span>
+        <p><strong>Ấm áp như chợ quen.</strong><br>Rõ ràng như một danh sách mua hàng.</p>
+      </div>
+    </header>
+
+    <section class="screens" aria-label="Các màn hình ứng dụng Makko">
+      <!-- 01 · Home -->
+      <article class="phone" aria-label="Màn hình trang chủ">
+        <div class="status"><span>9:41</span><span>● ● ▰</span></div>
+        <div class="app home">
+          <header class="topbar">
+            <div>
+              <p class="micro">GIAO ĐẾN</p>
+              <button class="location">Phường Bến Nghé⌄</button>
+            </div>
+            <button class="avatar">AN<span></span></button>
+          </header>
+          <section class="hello">
+            <p>Chào buổi sáng, An</p>
+            <h2>Hôm nay bạn cần<br>mua gì ở chợ?</h2>
+          </section>
+          <div class="search"><span>⌕</span><span>Tìm rau, thịt, đồ khô...</span><button>⌁</button></div>
+          <div class="quick-grid">
+            <button><span class="quick-icon">＋</span><b>Tạo yêu cầu</b><small>Nhờ người gần bạn</small></button>
+            <button><span class="quick-icon warm">↗</span><b>Đi chợ giúp</b><small>Kiếm thêm thu nhập</small></button>
+          </div>
+          <div class="section-title"><h3>Gần bạn</h3><button>Xem tất cả</button></div>
+          <div class="chips"><button class="active">Tất cả</button><button>Rau củ</button><button>Thịt cá</button><button>Đồ khô</button></div>
+          <div class="request-card">
+            <div class="request-top"><div class="mini-avatar peach">MH</div><div><b>Minh Hà</b><small>★ 4.9 · 350m</small></div><span class="time-tag">25 phút</span></div>
+            <h4>Bữa cơm chiều cho gia đình</h4>
+            <div class="items"><span>🥬 Rau muống ×2</span><span>🥩 Thịt ba chỉ 500g</span><span>＋ 3 món</span></div>
+            <div class="card-foot"><div><small>PHÍ ĐI CHỢ</small><strong>32.000đ</strong></div><button>Nhận đơn</button></div>
+          </div>
+          <nav class="nav"><button class="selected"><i>⌂</i>Trang chủ</button><button><i>⌕</i>Khám phá</button><button class="nav-add">＋</button><button><i>▤</i>Đơn hàng</button><button><i>○</i>Tài khoản</button></nav>
+        </div>
+      </article>
+
+      <!-- 02 · Detail -->
+      <article class="phone" aria-label="Màn hình chi tiết yêu cầu">
+        <div class="status"><span>9:41</span><span>● ● ▰</span></div>
+        <div class="app detail">
+          <header class="simple-head"><button>‹</button><h3>Chi tiết yêu cầu</h3><button>•••</button></header>
+          <div class="poster">
+            <div class="basket-art"><span>🥬</span><span>🥕</span><span>🍅</span></div>
+            <span class="open-pill">Đang tìm người đi chợ</span>
+          </div>
+          <section class="detail-body">
+            <div class="requester"><div class="mini-avatar peach">MH</div><div><b>Minh Hà</b><small>★ 4.9 · 18 lượt đánh giá</small></div><button>Nhắn tin</button></div>
+            <h2>Bữa cơm chiều<br>cho gia đình</h2>
+            <div class="meta-row"><span>◷ Giao trước 17:30</span><span>⌖ Cách bạn 350m</span></div>
+            <div class="divider"></div>
+            <div class="section-title"><h3>Danh sách cần mua</h3><span>5 món</span></div>
+            <ul class="shopping-list">
+              <li><span class="food green">🥬</span><div><b>Rau muống</b><small>2 bó · chọn non</small></div><strong>~24.000đ</strong></li>
+              <li><span class="food red">🥩</span><div><b>Thịt ba chỉ</b><small>500g · ít mỡ</small></div><strong>~75.000đ</strong></li>
+              <li><span class="food yellow">🥚</span><div><b>Trứng gà</b><small>10 quả</small></div><strong>~32.000đ</strong></li>
+            </ul>
+            <button class="more">Xem thêm 2 món⌄</button>
+          </section>
+          <footer class="sticky-action"><div><small>Bạn nhận được</small><strong>32.000đ</strong></div><button>Nhận đi chợ giúp</button></footer>
+        </div>
+      </article>
+
+      <!-- 03 · Create / Step 1 -->
+      <article class="phone" aria-label="Tạo yêu cầu - thông tin cơ bản">
+        <div class="status"><span>9:41</span><span>● ● ▰</span></div>
+        <div class="app create">
+          <header class="simple-head"><button>×</button><h3>Tạo yêu cầu</h3><button class="text-action">Lưu nháp</button></header>
+          <div class="progress"><span class="done"></span><span></span><span></span><span></span></div>
+          <section class="form-body create-scroll">
+            <p class="step">BƯỚC 1/4 · THÔNG TIN</p>
+            <h2>Bạn cần mua gì?</h2>
+            <p class="muted">Đặt tên ngắn gọn để hàng xóm hiểu ngay yêu cầu của bạn.</p>
+            <div class="form-card request-basics">
+              <label>TÊN YÊU CẦU</label>
+              <div class="input-box filled">Bữa cơm chiều cho gia đình <span>31/80</span></div>
+              <label>MÔ TẢ THÊM <em>KHÔNG BẮT BUỘC</em></label>
+              <div class="textarea-box">Nhờ mua đồ tươi, ưu tiên hàng Việt Nam. Nếu giá chênh nhiều vui lòng nhắn mình trước nhé.</div>
+              <label>MUA Ở ĐÂU?</label>
+              <button class="choice-row selected-choice"><i>▦</i><span><b>Chợ Bến Thành</b><small>Phường Bến Thành · cách 1,2 km</small></span><em>✓</em></button>
+              <button class="choice-row"><i>⌖</i><span><b>Bất kỳ chợ nào gần đây</b><small>Người đi chợ tự chọn nơi phù hợp</small></span><em>›</em></button>
+              <label>ẢNH THAM KHẢO</label>
+              <button class="upload-box"><i>＋</i><span><b>Thêm ảnh</b><small>Tối đa 4 ảnh · JPG, PNG</small></span></button>
+            </div>
+          </section>
+          <footer class="sticky-action single"><button>Tiếp tục · Thêm món</button></footer>
+        </div>
+      </article>
+
+      <!-- 04 · Create / Step 2 -->
+      <article class="phone" aria-label="Màn hình tạo yêu cầu">
+        <div class="status"><span>9:41</span><span>● ● ▰</span></div>
+        <div class="app create">
+          <header class="simple-head"><button>‹</button><h3>Tạo yêu cầu</h3><button class="text-action">Lưu nháp</button></header>
+          <div class="progress"><span class="done"></span><span class="done"></span><span></span><span></span></div>
+          <section class="form-body">
+            <p class="step">BƯỚC 2/4 · DANH SÁCH</p>
+            <h2>Danh sách đi chợ</h2>
+            <p class="muted">Thêm món và ghi chú thật cụ thể để người mua dễ chọn nhé.</p>
+            <div class="form-card">
+              <label>TÊN MÓN</label>
+              <div class="field-row"><div class="food green">🥬</div><div class="field"><b>Rau muống</b><small>Ví dụ: rau, thịt, gia vị...</small></div></div>
+              <div class="two-cols"><div><label>SỐ LƯỢNG</label><div class="counter"><button>−</button><b>2</b><button>＋</button></div></div><div><label>ĐƠN VỊ</label><button class="select">Bó⌄</button></div></div>
+              <label>GHI CHÚ CHO NGƯỜI MUA</label>
+              <div class="note-field">Chọn rau non, cọng nhỏ</div>
+              <label class="toggle-line"><span><b>Cho phép thay thế</b><small>Nếu cửa hàng hết món này</small></span><i></i></label>
+            </div>
+            <button class="add-item">＋ Thêm món khác</button>
+            <div class="tip"><span>💡</span><p><b>Mẹo nhỏ từ Makko</b><br>Thêm ảnh tham khảo giúp chọn đúng món hơn.</p></div>
+          </section>
+          <footer class="sticky-action single"><button>Tiếp tục · Chọn thời gian</button></footer>
+        </div>
+      </article>
+
+      <!-- 05 · Create / Step 3 -->
+      <article class="phone" aria-label="Tạo yêu cầu - giao hàng và chi phí">
+        <div class="status"><span>9:41</span><span>● ● ▰</span></div>
+        <div class="app create">
+          <header class="simple-head"><button>‹</button><h3>Tạo yêu cầu</h3><button class="text-action">Lưu nháp</button></header>
+          <div class="progress"><span class="done"></span><span class="done"></span><span class="done"></span><span></span></div>
+          <section class="form-body create-scroll">
+            <p class="step">BƯỚC 3/4 · GIAO HÀNG</p>
+            <h2>Thời gian & địa chỉ</h2>
+            <p class="muted">Chọn lúc bạn tiện nhận và mức phí phù hợp.</p>
+            <div class="form-card delivery-form">
+              <label>GIAO ĐẾN</label>
+              <button class="choice-row selected-choice"><i>⌂</i><span><b>Nhà · Hoài An</b><small>12 Nguyễn Huệ, P. Bến Nghé, Q.1</small></span><em>›</em></button>
+              <label>THỜI GIAN NHẬN</label>
+              <div class="date-chips"><button>Hôm nay<small>12/09</small></button><button class="on">Ngày mai<small>13/09</small></button><button>Thứ Hai<small>14/09</small></button></div>
+              <div class="time-row"><button>16:00</button><button class="on">17:30</button><button>18:30</button><button>19:30</button></div>
+              <label>PHÍ ĐI CHỢ</label>
+              <div class="fee-box"><button>−</button><div><strong>32.000đ</strong><small>Makko đề xuất 25.000đ – 40.000đ</small></div><button>＋</button></div>
+              <div class="fee-note"><span>♥</span><p>Phí cao hơn giúp yêu cầu được nhận nhanh hơn, đặc biệt vào giờ cao điểm.</p></div>
+              <label>GHI CHÚ GIAO HÀNG</label>
+              <div class="input-box">Gọi mình khi đến sảnh chung cư</div>
+            </div>
+          </section>
+          <footer class="sticky-action single"><button>Tiếp tục · Kiểm tra lại</button></footer>
+        </div>
+      </article>
+
+      <!-- 06 · Create / Review -->
+      <article class="phone" aria-label="Tạo yêu cầu - kiểm tra lại">
+        <div class="status"><span>9:41</span><span>● ● ▰</span></div>
+        <div class="app create review-screen">
+          <header class="simple-head"><button>‹</button><h3>Kiểm tra lại</h3><button class="text-action">Sửa</button></header>
+          <div class="progress"><span class="done"></span><span class="done"></span><span class="done"></span><span class="done"></span></div>
+          <section class="review-body">
+            <p class="step">BƯỚC 4/4 · XÁC NHẬN</p>
+            <h2>Sẵn sàng đăng yêu cầu?</h2>
+            <div class="review-card hero-review"><span>🧺</span><div><small>YÊU CẦU CỦA BẠN</small><h3>Bữa cơm chiều cho gia đình</h3><p>Chợ Bến Thành · 5 món</p></div></div>
+            <div class="review-card compact-list">
+              <div class="review-title"><b>Danh sách đi chợ</b><button>Sửa</button></div>
+              <p><span>🥬 Rau muống · 2 bó</span><strong>~24.000đ</strong></p>
+              <p><span>🥩 Thịt ba chỉ · 500g</span><strong>~75.000đ</strong></p>
+              <p><span>🥚 Trứng gà · 10 quả</span><strong>~32.000đ</strong></p>
+              <button class="more-line">＋ 2 món khác</button>
+            </div>
+            <div class="review-card summary-list">
+              <p><i>⌂</i><span><small>Giao đến</small><b>12 Nguyễn Huệ, P. Bến Nghé</b></span></p>
+              <p><i>◷</i><span><small>Nhận trước</small><b>17:30 · Ngày mai, 13/09</b></span></p>
+              <p><i>₫</i><span><small>Phí đi chợ</small><b>32.000đ</b></span></p>
+            </div>
+            <div class="price-total"><span><small>Tạm tính tiền hàng</small><b>Khoảng 228.000đ</b></span><strong>＋ 32.000đ phí</strong></div>
+          </section>
+          <footer class="sticky-action single publish"><small>Bằng việc đăng, bạn đồng ý với quy tắc cộng đồng Makko.</small><button>Đăng yêu cầu</button></footer>
+        </div>
+      </article>
+
+      <!-- 07 · Create / Success -->
+      <article class="phone" aria-label="Tạo yêu cầu thành công">
+        <div class="status success-status"><span>9:41</span><span>● ● ▰</span></div>
+        <div class="app success-screen">
+          <div class="success-art"><div class="sun-ring ring-one"></div><div class="sun-ring ring-two"></div><span class="success-basket">🧺</span><i>✓</i></div>
+          <section class="success-copy">
+            <p class="step">YÊU CẦU #MK1050</p>
+            <h2>Đã gửi lời nhờ<br>đến hàng xóm!</h2>
+            <p>Makko đang tìm người đi chợ phù hợp gần bạn. Thường chỉ mất khoảng 5–10 phút.</p>
+          </section>
+          <div class="success-info">
+            <div><span>◷</span><p><small>GIAO TRƯỚC</small><b>17:30 · Ngày mai</b></p></div>
+            <div><span>⌖</span><p><small>ĐỊA CHỈ</small><b>12 Nguyễn Huệ, Quận 1</b></p></div>
+          </div>
+          <div class="searching"><span class="pulse-dot"></span><div><b>Đang tìm người đi chợ…</b><small>Bạn có thể rời màn hình này</small></div></div>
+          <footer class="success-actions"><button>Xem yêu cầu của tôi</button><button class="ghost">Về trang chủ</button></footer>
+        </div>
+      </article>
+
+      <!-- 08 · Tracking -->
+      <article class="phone" aria-label="Màn hình theo dõi đơn">
+        <div class="status"><span>9:41</span><span>● ● ▰</span></div>
+        <div class="app tracking">
+          <header class="simple-head"><button>‹</button><h3>Theo dõi đơn</h3><button>?</button></header>
+          <section class="track-hero">
+            <span class="status-badge">ĐANG ĐI CHỢ</span>
+            <h2>Chú Tư đang chọn<br>đồ giúp bạn</h2>
+            <p>Dự kiến giao lúc 17:15</p>
+            <div class="shopper-card"><div class="mini-avatar dark">TƯ</div><div><b>Nguyễn Văn Tư</b><small>★ 4.95 · 126 đơn</small></div><button>☎</button><button>✉</button></div>
+          </section>
+          <section class="timeline-section">
+            <h3>Hành trình đơn hàng</h3>
+            <ol class="timeline">
+              <li class="complete"><i>✓</i><div><b>Đã nhận yêu cầu</b><small>16:02</small></div></li>
+              <li class="complete"><i>✓</i><div><b>Đã đến chợ Bến Thành</b><small>16:18</small></div></li>
+              <li class="current"><i>●</i><div><b>Đang chọn hàng</b><small>Chú Tư vừa gửi 1 ảnh</small><div class="photo-msg">🧺 <span>“Rau hôm nay rất tươi nha con!”</span></div></div></li>
+              <li><i></i><div><b>Giao đến bạn</b><small>Dự kiến 17:15</small></div></li>
+            </ol>
+          </section>
+          <footer class="sticky-action single outline-wrap"><button class="outline">Xem chi tiết đơn</button></footer>
+        </div>
+      </article>
+
+      <!-- 05 · Orders -->
+      <article class="phone" aria-label="Màn hình danh sách đơn">
+        <div class="status"><span>9:41</span><span>● ● ▰</span></div>
+        <div class="app orders">
+          <header class="page-head"><div><p class="micro">HOẠT ĐỘNG</p><h2>Đơn hàng</h2></div><button>⌕</button></header>
+          <div class="tabbar"><button class="active">Đang diễn ra <span>2</span></button><button>Đã xong</button></div>
+          <section class="order-list">
+            <div class="order-card accent">
+              <div class="order-label"><span>ĐANG ĐI CHỢ</span><small>#MK1048</small></div>
+              <h3>Bữa cơm chiều cho gia đình</h3>
+              <p>5 món · Giao trước 17:30</p>
+              <div class="person"><div class="mini-avatar dark">TƯ</div><span><small>Người đi chợ</small><b>Chú Tư · ★ 4.95</b></span><button>Theo dõi</button></div>
+            </div>
+            <div class="order-card">
+              <div class="order-label"><span class="waiting">ĐANG TÌM NGƯỜI</span><small>#MK1049</small></div>
+              <h3>Trái cây & đồ ăn sáng</h3>
+              <p>4 món · Giao trước 07:00 mai</p>
+              <div class="waiting-row"><span>◷ Đã đăng 8 phút trước</span><button>Chỉnh sửa</button></div>
+            </div>
+            <div class="empty-note"><span>♧</span><p><b>Mỗi chuyến chợ, thêm một kết nối.</b><br>Makko giữ bạn gần hơn với những người hàng xóm.</p></div>
+          </section>
+          <nav class="nav"><button><i>⌂</i>Trang chủ</button><button><i>⌕</i>Khám phá</button><button class="nav-add">＋</button><button class="selected"><i>▤</i>Đơn hàng</button><button><i>○</i>Tài khoản</button></nav>
+        </div>
+      </article>
+
+      <!-- 06 · Profile -->
+      <article class="phone" aria-label="Màn hình hồ sơ">
+        <div class="status"><span>9:41</span><span>● ● ▰</span></div>
+        <div class="app profile">
+          <header class="page-head"><div><p class="micro">GÓC CỦA BẠN</p><h2>Tài khoản</h2></div><button>⚙</button></header>
+          <section class="profile-card">
+            <div class="big-avatar">AN<span></span></div><div><h3>Nguyễn Hoài An</h3><p>Thành viên từ tháng 6, 2026</p><span class="verified">✓ Đã xác thực</span></div>
+          </section>
+          <section class="stats"><div><strong>4.9</strong><small>Đánh giá</small></div><div><strong>18</strong><small>Đơn đã nhờ</small></div><div><strong>7</strong><small>Lần đi giúp</small></div></section>
+          <div class="kindness"><span>✦</span><div><b>Hạt tử tế của bạn</b><p>Bạn đã giúp 7 người hàng xóm đi chợ.</p><div class="kindness-bar"><i></i></div><small>3 lần nữa để nhận huy hiệu “Người quen của chợ”</small></div></div>
+          <section class="menu">
+            <button><i>⌂</i><span><b>Địa chỉ của tôi</b><small>Nhà, Công ty</small></span><em>›</em></button>
+            <button><i>♡</i><span><b>Đánh giá & uy tín</b><small>Xem 18 lượt đánh giá</small></span><em>›</em></button>
+            <button><i>▣</i><span><b>Thanh toán</b><small>Tiền mặt</small></span><em>›</em></button>
+            <button><i>?</i><span><b>Trợ giúp</b><small>Makko luôn ở đây</small></span><em>›</em></button>
+          </section>
+          <nav class="nav"><button><i>⌂</i>Trang chủ</button><button><i>⌕</i>Khám phá</button><button class="nav-add">＋</button><button><i>▤</i>Đơn hàng</button><button class="selected"><i>○</i>Tài khoản</button></nav>
+        </div>
+      </article>
+    </section>
+
+    <section class="system">
+      <div><p class="eyebrow">DESIGN SYSTEM</p><h2>Màu của một buổi chợ sớm.</h2></div>
+      <div class="swatches"><span style="--c:#F4A261"><i></i>#F4A261<br><b>Cam Makko</b></span><span style="--c:#FFF2D6"><i></i>#FFF2D6<br><b>Nắng sớm</b></span><span style="--c:#213A2F"><i></i>#213A2F<br><b>Lá đậm</b></span><span style="--c:#D95D39"><i></i>#D95D39<br><b>Gạch chợ</b></span><span style="--c:#FBF8F0"><i></i>#FBF8F0<br><b>Giấy gói</b></span></div>
+    </section>
+  </main>
+  <script>
+    if (new URLSearchParams(window.location.search).get('flow') === 'create') {
+      document.title = 'Makko — Luồng tạo yêu cầu';
+      document.querySelector('.board-head .eyebrow').textContent = 'MAKKO · CREATE REQUEST FLOW';
+      document.querySelector('.board-head h1').innerHTML = 'Tạo một lời nhờ,<br><em>gửi đến hàng xóm.</em>';
+      document.querySelector('.brand-note p').innerHTML = '<strong>5 màn hình · 4 bước</strong><br>Mobile frame 390 × 844 px';
+      document.querySelectorAll('.phone').forEach((screen) => {
+        const label = screen.getAttribute('aria-label') || '';
+        if (!label.toLowerCase().includes('tạo yêu cầu')) screen.remove();
+      });
+      document.querySelector('.system').remove();
+    }
+  </script>
+</body>
+</html>

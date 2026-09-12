@@ -1,0 +1,32 @@
+{
+  "expo": {
+    "name": "Makko",
+    "slug": "makko",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "makko",
+    "userInterfaceStyle": "light",
+    "plugins": [
+      "expo-router",
+      [
+        "expo-web-browser",
+        {
+          "experimentalLauncherActivity": false
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.manakkusu.makko"
+    },
+    "android": {
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "output": "static"
+    }
+  }
+}
