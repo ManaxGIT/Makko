@@ -1,5 +1,7 @@
-import type { ComponentProps } from 'react';
+import { useEffect, useMemo, useState, type ComponentProps } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -7,12 +9,37 @@ import {
   View,
 } from 'react-native';
 import { SymbolView } from 'expo-symbols';
+import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { useAuth } from '@/features/auth/AuthProvider';
+import { supabase } from '@/lib/supabase';
 import { colors } from '@/theme/colors';
 import { fontFamilies, fontSizes } from '@/theme/typography';
 
 type SymbolName = ComponentProps<typeof SymbolView>['name'];
+
+type Profile = {
+  display_name: string;
+  created_at: string;
+};
+
+function getInitials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  return (parts.length ? parts.slice(-2).map((part) => part[0]) : ['M'])
+    .join('')
+    .toLocaleUpperCase('vi-VN');
+}
+
+function formatMemberSince(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Thành viên Makko';
+
+  return `Thành viên từ ${new Intl.DateTimeFormat('vi-VN', {
+    month: 'long',
+    year: 'numeric',
+  }).format(date)}`;
+}
 
 const stats = [
   { value: '4.9', label: 'Đánh giá' },
@@ -90,6 +117,62 @@ function MenuRow({ title, subtitle, symbol, isLast }: {
 }
 
 export default function ProfileScreen() {
+  const router = useRouter();
+  const { session } = useAuth();
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [signingOut, setSigningOut] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!session?.user.id) return;
+
+    let active = true;
+    setLoading(true);
+    supabase
+      .from('profiles')
+      .select('display_name, created_at')
+      .eq('id', session.user.id)
+      .single()
+      .then(({ data, error: profileError }) => {
+        if (!active) return;
+        setProfile(data);
+        setError(profileError ? 'Không thể tải hồ sơ lúc này.' : null);
+        setLoading(false);
+      });
+
+    return () => { active = false; };
+  }, [session?.user.id]);
+
+  const displayName = profile?.display_name
+    || session?.user.user_metadata.full_name
+    || session?.user.user_metadata.name
+    || session?.user.email?.split('@')[0]
+    || 'Người dùng Makko';
+  const initials = useMemo(() => getInitials(displayName), [displayName]);
+  const memberSince = formatMemberSince(profile?.created_at || session?.user.created_at || '');
+
+  const signOut = async () => {
+    setSigningOut(true);
+    setError(null);
+    const { error: signOutError } = await supabase.auth.signOut({ scope: 'local' });
+    setSigningOut(false);
+
+    if (signOutError) {
+      setError('Không thể đăng xuất. Vui lòng thử lại.');
+      return;
+    }
+
+    router.replace('/auth/login');
+  };
+
+  const confirmSignOut = () => {
+    Alert.alert('Đăng xuất?', 'Bạn sẽ cần đăng nhập lại để tiếp tục sử dụng Makko.', [
+      { text: 'Ở lại', style: 'cancel' },
+      { text: 'Đăng xuất', style: 'destructive', onPress: signOut },
+    ]);
+  };
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <ScrollView
@@ -112,14 +195,14 @@ export default function ProfileScreen() {
 
         <View style={styles.profileCard}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>AN</Text>
+            {loading ? <ActivityIndicator color={colors.forestMuted} size="small" /> : <Text style={styles.avatarText}>{initials}</Text>}
             <View style={styles.onlineDot} />
           </View>
           <View style={styles.profileCopy}>
-            <Text style={styles.name}>Nguyễn Hoài An</Text>
-            <Text style={styles.memberSince}>Thành viên từ tháng 6, 2026</Text>
+            <Text numberOfLines={1} style={styles.name}>{loading ? 'Đang tải hồ sơ…' : displayName}</Text>
+            <Text style={styles.memberSince}>{loading ? 'Đang đồng bộ tài khoản' : memberSince}</Text>
             <View style={styles.verifiedPill}>
-              <Text style={styles.verifiedText}>✓ Đã xác thực</Text>
+              <Text style={styles.verifiedText}>✓ Đã đăng nhập</Text>
             </View>
           </View>
         </View>
@@ -158,6 +241,17 @@ export default function ProfileScreen() {
             />
           ))}
         </View>
+
+        {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
+        <Pressable
+          accessibilityRole="button"
+          disabled={signingOut}
+          onPress={confirmSignOut}
+          style={({ pressed }) => [styles.signOutButton, (pressed || signingOut) && styles.pressed]}
+        >
+          <AppIcon name={{ ios: 'rectangle.portrait.and.arrow.right', android: 'logout', web: 'logout' }} color={colors.coral} />
+          <Text style={styles.signOutText}>{signingOut ? 'Đang đăng xuất…' : 'Đăng xuất'}</Text>
+        </Pressable>
       </ScrollView>
     </SafeAreaView>
   );
@@ -226,7 +320,7 @@ const styles = StyleSheet.create({
     right: -1,
     width: 10,
   },
-  profileCopy: { marginLeft: 14 },
+  profileCopy: { flex: 1, marginLeft: 14 },
   name: {
     color: colors.surface,
     fontFamily: fontFamilies.bodyBold,
@@ -344,5 +438,8 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.caption,
     marginTop: 3,
   },
+  error: { color: '#B42318', fontFamily: fontFamilies.body, fontSize: fontSizes.caption, marginTop: 12, textAlign: 'center' },
+  signOutButton: { alignItems: 'center', backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 14, borderWidth: 1, flexDirection: 'row', gap: 9, height: 48, justifyContent: 'center', marginTop: 14 },
+  signOutText: { color: colors.coral, fontFamily: fontFamilies.bodyBold, fontSize: fontSizes.bodySmall },
   pressed: { opacity: 0.65 },
 });

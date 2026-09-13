@@ -28,6 +28,9 @@ In Supabase Auth, enable the Google provider and add `makko://**` to the redirec
 URL allow list. Google Cloud must use the Supabase callback URL shown on the
 provider page as an authorized redirect URI.
 
+Authentication implementation status, temporary verification behavior, and
+production follow-ups are tracked in the repository's `product-schema-notes.md`.
+
 ## Shared bottom navigation
 
 All primary screens live under `app/(tabs)/`. The group layout configures the

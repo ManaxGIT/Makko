@@ -6,6 +6,7 @@ import * as WebBrowser from 'expo-web-browser';
 
 import { AuthField, AuthHeader, AuthIntro, AuthScreen, InlineLink, PrimaryButton } from '@/components/auth/AuthUI';
 import { useAuth } from '@/features/auth/AuthProvider';
+import { parseAuthIdentifier } from '@/features/auth/identifier';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 import { colors } from '@/theme/colors';
 import { fontFamilies, fontSizes } from '@/theme/typography';
@@ -15,7 +16,7 @@ WebBrowser.maybeCompleteAuthSession();
 export default function LoginScreen() {
   const router = useRouter();
   const { session } = useAuth();
-  const [phone, setPhone] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(true);
   const [visible, setVisible] = useState(false);
@@ -33,21 +34,18 @@ export default function LoginScreen() {
       return;
     }
 
-    const normalizedPhone = phone.replace(/\D/g, '').replace(/^0/, '');
-    if (normalizedPhone.length < 9 || password.length < 6) {
-      setError('Vui lòng nhập số điện thoại và mật khẩu hợp lệ.');
+    const credentials = parseAuthIdentifier(identifier);
+    if (!credentials || password.length < 6) {
+      setError('Vui lòng nhập email/số điện thoại và mật khẩu hợp lệ.');
       return;
     }
 
     setPending('password');
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      phone: `+84${normalizedPhone}`,
-      password,
-    });
+    const { error: signInError } = await supabase.auth.signInWithPassword({ ...credentials, password });
     setPending(null);
 
     if (signInError) {
-      setError('Số điện thoại hoặc mật khẩu không đúng.');
+      setError('Email, số điện thoại hoặc mật khẩu không đúng.');
       return;
     }
 
@@ -88,6 +86,17 @@ export default function LoginScreen() {
 
     const callbackUrl = new URL(result.url);
     const hash = new URLSearchParams(callbackUrl.hash.replace(/^#/, ''));
+    const oauthErrorDescription = hash.get('error_description') ?? callbackUrl.searchParams.get('error_description');
+
+    if (oauthErrorDescription) {
+      setPending(null);
+      const normalizedError = oauthErrorDescription.toLowerCase();
+      setError(normalizedError.includes('identity') || normalizedError.includes('already') || normalizedError.includes('email')
+        ? 'Email Google này đã có tài khoản nhưng chưa thể liên kết. Hãy đăng nhập bằng mật khẩu hoặc xác nhận email rồi thử lại Google.'
+        : 'Không thể đăng nhập Google. Vui lòng thử lại.');
+      return;
+    }
+
     const accessToken = hash.get('access_token') ?? callbackUrl.searchParams.get('access_token');
     const refreshToken = hash.get('refresh_token') ?? callbackUrl.searchParams.get('refresh_token');
 
@@ -115,7 +124,7 @@ export default function LoginScreen() {
     <AuthScreen footer={<InlineLink before="Chưa có tài khoản? " label="Đăng ký ngay" onPress={() => router.replace('/auth/register')} />}>
       <AuthHeader />
       <AuthIntro eyebrow="CHÀO MỪNG TRỞ LẠI" title="Đăng nhập" subtitle="Cùng xem hôm nay khu phố đang cần gì nhé." />
-      <AuthField autoComplete="tel" keyboardType="phone-pad" label="SỐ ĐIỆN THOẠI" onChangeText={setPhone} placeholder="912 345 678" prefix="🇻🇳 +84" value={phone} />
+      <AuthField autoCapitalize="none" autoComplete="username" keyboardType="email-address" label="EMAIL HOẶC SỐ ĐIỆN THOẠI" onChangeText={setIdentifier} placeholder="tengmail, ban@email.com hoặc 0912..." value={identifier} />
       <AuthField autoComplete="current-password" label="MẬT KHẨU" onChangeText={setPassword} onSubmitEditing={signInWithPassword} placeholder="Nhập mật khẩu" returnKeyType="done" secureTextEntry={!visible} trailing={<Pressable accessibilityLabel={visible ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'} onPress={() => setVisible((value) => !value)}><Text style={styles.eye}>{visible ? '◌' : '◉'}</Text></Pressable>} value={password} />
       <View style={styles.options}>
         <Pressable onPress={() => setRemember((value) => !value)} style={styles.remember}>
