@@ -23,13 +23,23 @@ Run `npm run typecheck` before committing UI changes.
 
 ## Authentication setup
 
-Copy `.env.example` to `.env` and provide the project URL and publishable key.
+Copy `.env.example` to `.env` and provide the project URL, publishable key, and
+the FastAPI base URL through `EXPO_PUBLIC_API_URL`. Physical-device development
+is the default: use the computer's LAN IP rather than `localhost`, and keep the
+phone and computer on the same Wi-Fi network.
 In Supabase Auth, enable the Google provider and add `makko://**` to the redirect
 URL allow list. Google Cloud must use the Supabase callback URL shown on the
 provider page as an authorized redirect URI.
 
 Authentication implementation status, temporary verification behavior, and
 production follow-ups are tracked in the repository's `product-schema-notes.md`.
+
+## Data API boundary
+
+Feature data is loaded through FastAPI in `apps/api`; mobile must not call
+Supabase tables or read-only database RPCs directly. The shared Supabase client
+remains responsible for authentication sessions, and its access token is attached
+to FastAPI requests by `src/lib/api.ts`.
 
 ## Shared bottom navigation
 

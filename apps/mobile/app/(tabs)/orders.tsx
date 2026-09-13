@@ -1,21 +1,45 @@
 import type { ComponentProps } from 'react';
-import { useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { listMyOrders, OrderStatus, OrderSummary } from '@/features/orders/api';
 import { colors } from '@/theme/colors';
 import { fontFamilies, fontSizes } from '@/theme/typography';
 
 type SymbolName = ComponentProps<typeof SymbolView>['name'];
 type OrderTab = 'active' | 'completed';
+const completedStatuses: OrderStatus[] = ['completed', 'cancelled'];
+const statusLabels: Record<OrderStatus, string> = {
+  draft: 'BẢN NHÁP', open: 'ĐANG TÌM NGƯỜI', accepted: 'ĐÃ CÓ NGƯỜI NHẬN',
+  shopping: 'ĐANG ĐI CHỢ', delivering: 'ĐANG GIAO', completed: 'ĐÃ HOÀN THÀNH',
+  cancelled: 'ĐÃ HỦY', disputed: 'ĐANG KHIẾU NẠI',
+};
+
+function initials(name: string) {
+  return name.split(/\s+/).filter(Boolean).slice(-2).map((part) => part[0]).join('').toLocaleUpperCase('vi');
+}
+
+function formatDeadline(value: string | null) {
+  if (!value) return 'Thời gian linh hoạt';
+  return `Giao trước ${new Date(value).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })}`;
+}
+
+function relativeTime(value: string) {
+  const minutes = Math.max(0, Math.round((Date.now() - new Date(value).getTime()) / 60000));
+  if (minutes < 60) return `${minutes} phút trước`;
+  if (minutes < 1440) return `${Math.round(minutes / 60)} giờ trước`;
+  return `${Math.round(minutes / 1440)} ngày trước`;
+}
 
 function AppIcon({ name, color = '#000000', size = 18 }: {
   name: SymbolName;
@@ -61,54 +85,47 @@ function TabButton({
 }
 
 function OrderCard({
-  deadline,
-  id,
-  itemCount,
-  status,
-  title,
-  type,
+  order,
 }: {
-  deadline: string;
-  id: string;
-  itemCount: number;
-  status: string;
-  title: string;
-  type: 'shopping' | 'waiting';
+  order: OrderSummary;
 }) {
   const router = useRouter();
-  const isShopping = type === 'shopping';
+  const isWaiting = order.status === 'draft' || order.status === 'open';
+  const isProgress = ['accepted', 'shopping', 'delivering', 'disputed'].includes(order.status);
+  const isCompleted = completedStatuses.includes(order.status);
+  const counterpartLabel = order.role === 'customer' ? 'Người đi chợ' : 'Người nhờ mua';
 
   return (
-    <View style={[styles.orderCard, isShopping && styles.activeOrderCard]}>
+    <View style={[styles.orderCard, isProgress && styles.activeOrderCard]}>
       <View style={styles.orderTopRow}>
-        <Text style={[styles.status, isShopping ? styles.shoppingStatus : styles.waitingStatus]}>
-          {status}
+        <Text style={[styles.status, isProgress ? styles.shoppingStatus : styles.waitingStatus]}>
+          {statusLabels[order.status]}
         </Text>
       </View>
 
-      <Text style={styles.orderTitle}>{title}</Text>
-      <Text style={styles.orderSummary}>{itemCount} món · {deadline}</Text>
+      <Text style={styles.orderTitle}>{order.title}</Text>
+      <Text style={styles.orderSummary}>{order.itemCount} món · {formatDeadline(order.deliverBy)}</Text>
 
-      {isShopping ? (
+      {!isWaiting && order.counterpart ? (
         <View style={styles.shopperRow}>
           <View style={styles.shopperAvatar}>
-            <Text style={styles.shopperAvatarText}>TƯ</Text>
+            <Text style={styles.shopperAvatarText}>{initials(order.counterpart.displayName)}</Text>
           </View>
           <View>
-            <Text style={styles.shopperLabel}>Người đi chợ</Text>
-            <Text style={styles.shopperName}>Chú Tư · ★ 4.95</Text>
+            <Text style={styles.shopperLabel}>{counterpartLabel}</Text>
+            <Text style={styles.shopperName}>{order.counterpart.displayName} · ★ {order.counterpart.ratingCount ? order.counterpart.averageRating.toFixed(2) : 'Mới'}</Text>
           </View>
           <Pressable
             accessibilityRole="button"
-            onPress={() => router.push(`/requests/${id}`)}
+            onPress={() => router.push(isCompleted ? `/requests/${order.id}/details` : `/requests/${order.id}`)}
             style={({ pressed }) => [styles.trackButton, pressed && styles.pressed]}
           >
-            <Text style={styles.trackButtonText}>Theo dõi</Text>
+            <Text style={styles.trackButtonText}>{isCompleted ? 'Chi tiết' : 'Theo dõi'}</Text>
           </Pressable>
         </View>
       ) : (
         <View style={styles.waitingFooter}>
-          <Text style={styles.postedTime}>◷ Đã đăng 8 phút trước</Text>
+          <Text style={styles.postedTime}>◷ Đã đăng {relativeTime(order.publishedAt ?? order.createdAt)}</Text>
           <Pressable
             accessibilityRole="button"
             style={({ pressed }) => [styles.editButton, pressed && styles.pressed]}
@@ -123,6 +140,27 @@ function OrderCard({
 
 export default function OrdersScreen() {
   const [activeTab, setActiveTab] = useState<OrderTab>('active');
+  const [orders, setOrders] = useState<OrderSummary[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadOrders = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      setOrders(await listMyOrders());
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : 'Không thể tải đơn hàng lúc này.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useFocusEffect(useCallback(() => { void loadOrders(); }, [loadOrders]));
+
+  const activeOrders = useMemo(() => orders.filter((order) => !completedStatuses.includes(order.status)), [orders]);
+  const completedOrders = useMemo(() => orders.filter((order) => completedStatuses.includes(order.status)), [orders]);
+  const visibleOrders = activeTab === 'active' ? activeOrders : completedOrders;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -145,7 +183,7 @@ export default function OrdersScreen() {
       <View accessibilityRole="tablist" style={styles.tabs}>
         <TabButton
           active={activeTab === 'active'}
-          count={2}
+          count={activeOrders.length}
           label="Đang diễn ra"
           onPress={() => setActiveTab('active')}
         />
@@ -160,29 +198,16 @@ export default function OrdersScreen() {
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
       >
-        {activeTab === 'active' ? (
-          <>
-            <OrderCard
-              deadline="Giao trước 17:30"
-              id="81f83d5e-1f7c-4dcb-a221-b487358a16bb"
-              itemCount={5}
-              status="ĐANG ĐI CHỢ"
-              title="Bữa cơm chiều cho gia đình"
-              type="shopping"
-            />
-            <OrderCard
-              deadline="Giao trước 07:00 mai"
-              id="f1c79ef1-8f60-47bc-aeb8-0f461e4cabcc"
-              itemCount={4}
-              status="ĐANG TÌM NGƯỜI"
-              title="Trái cây & đồ ăn sáng"
-              type="waiting"
-            />
-          </>
-        ) : (
+        {loading ? <View style={styles.emptyState}><ActivityIndicator color={colors.coral} /><Text style={styles.emptyDescription}>Đang tải đơn hàng...</Text></View> : error ? (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyTitle}>Chưa có đơn đã hoàn thành</Text>
-            <Text style={styles.emptyDescription}>Các đơn đã xong sẽ xuất hiện tại đây.</Text>
+            <Text style={styles.emptyTitle}>Không thể tải đơn hàng</Text>
+            <Text style={styles.emptyDescription}>{error}</Text>
+            <Pressable accessibilityRole="button" onPress={() => void loadOrders()} style={({ pressed }) => [styles.retryButton, pressed && styles.pressed]}><Text style={styles.retryText}>Thử lại</Text></Pressable>
+          </View>
+        ) : visibleOrders.length ? visibleOrders.map((order) => <OrderCard key={order.id} order={order} />) : (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyTitle}>{activeTab === 'active' ? 'Chưa có đơn đang diễn ra' : 'Chưa có đơn đã hoàn thành'}</Text>
+            <Text style={styles.emptyDescription}>{activeTab === 'active' ? 'Các đơn mới sẽ xuất hiện tại đây.' : 'Các đơn đã xong sẽ xuất hiện tại đây.'}</Text>
           </View>
         )}
 
@@ -360,5 +385,7 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.bodySmall,
     marginTop: 5,
   },
+  retryButton: { backgroundColor: colors.orange, borderRadius: 9, marginTop: 12, paddingHorizontal: 14, paddingVertical: 9 },
+  retryText: { color: colors.forest, fontFamily: fontFamilies.bodyBold, fontSize: fontSizes.bodySmall },
   pressed: { opacity: 0.65 },
 });

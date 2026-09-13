@@ -1,6 +1,7 @@
 import type { ComponentProps } from 'react';
-import { useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -12,12 +13,44 @@ import { useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ExploreRequest } from '@/features/explore/api';
+import { getHomeDashboard, HomeDashboard } from '@/features/home/api';
 import { colors } from '@/theme/colors';
 import { fontFamilies, fontSizes } from '@/theme/typography';
 
 type SymbolName = ComponentProps<typeof SymbolView>['name'];
 
 const filters = ['Tất cả', 'Rau củ', 'Thịt cá', 'Đồ khô'];
+const normalize = (value: string) => value.toLocaleLowerCase('vi');
+
+function initials(name: string) {
+  return name.split(/\s+/).filter(Boolean).slice(-2).map((part) => part[0]).join('').toLocaleUpperCase('vi');
+}
+
+function firstName(name: string) {
+  return name.trim().split(/\s+/).at(-1) ?? name;
+}
+
+function deadline(value: string | null) {
+  if (!value) return 'Linh hoạt';
+  const minutes = Math.max(0, Math.round((new Date(value).getTime() - Date.now()) / 60000));
+  if (minutes < 60) return `${minutes} phút`;
+  if (minutes < 1440) return `${Math.round(minutes / 60)} giờ`;
+  return new Date(value).toLocaleDateString('vi-VN');
+}
+
+function distance(value: number | null) {
+  if (value === null) return 'Chưa rõ';
+  return value < 1000 ? `${Math.round(value / 10) * 10}m` : `${(value / 1000).toLocaleString('vi-VN', { maximumFractionDigits: 1 })}km`;
+}
+
+function isInFilter(request: ExploreRequest, filter: string) {
+  if (filter === 'Tất cả') return true;
+  const value = normalize(request.items.map((item) => item.name).join(' '));
+  if (filter === 'Rau củ') return ['rau', 'củ', 'cải', 'khoai'].some((word) => value.includes(word));
+  if (filter === 'Thịt cá') return ['thịt', 'cá', 'tôm', 'gà', 'bò', 'heo'].some((word) => value.includes(word));
+  return ['gạo', 'đậu', 'mì', 'bún', 'khô'].some((word) => value.includes(word));
+}
 
 function AppIcon({ name, color = colors.forest, size = 20 }: {
   name: SymbolName;
@@ -74,6 +107,34 @@ export default function HomeScreen() {
   const router = useRouter();
   const [activeFilter, setActiveFilter] = useState(filters[0]);
   const [query, setQuery] = useState('');
+  const [dashboard, setDashboard] = useState<HomeDashboard | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadDashboard = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      setDashboard(await getHomeDashboard({ nearbyLimit: 5 }));
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : 'Không thể tải trang chủ lúc này.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void loadDashboard(); }, [loadDashboard]);
+
+  const nearbyRequest = useMemo(() => {
+    const needle = normalize(query.trim());
+    return dashboard?.nearbyRequests.find((request) =>
+      isInFilter(request, activeFilter)
+      && (!needle || normalize([request.title, request.ownerDisplayName, ...request.items.map((item) => item.name)].join(' ')).includes(needle)),
+    );
+  }, [activeFilter, dashboard, query]);
+
+  const displayName = dashboard?.profile.displayName ?? 'bạn';
+  const locationName = dashboard?.location?.ward ?? dashboard?.location?.district ?? 'Chọn khu vực';
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -86,7 +147,7 @@ export default function HomeScreen() {
           <View>
             <Text style={styles.eyebrow}>GIAO ĐẾN</Text>
             <Pressable accessibilityRole="button" style={styles.locationButton}>
-              <Text style={styles.location}>Phường Bến Nghé</Text>
+              <Text style={styles.location}>{locationName}</Text>
               <AppIcon
                 name={{ ios: 'chevron.down', android: 'keyboard_arrow_down', web: 'keyboard_arrow_down' }}
                 size={15}
@@ -99,13 +160,13 @@ export default function HomeScreen() {
             onPress={() => router.push('/(tabs)/profile')}
             style={({ pressed }) => [styles.avatar, pressed && styles.pressed]}
           >
-            <Text style={styles.avatarText}>AN</Text>
+            <Text style={styles.avatarText}>{initials(displayName)}</Text>
             <View style={styles.onlineDot} />
           </Pressable>
         </View>
 
         <View style={styles.hero}>
-          <Text style={styles.greeting}>Chào buổi sáng, An</Text>
+          <Text style={styles.greeting}>Xin chào, {firstName(displayName)}</Text>
           <Text style={styles.heading}>Hôm nay bạn cần{`\n`}mua gì ở chợ?</Text>
         </View>
 
@@ -193,48 +254,47 @@ export default function HomeScreen() {
           })}
         </ScrollView>
 
-        <View style={styles.requestCard}>
+        {loading ? <View style={styles.statusCard}><ActivityIndicator color={colors.coral} /><Text style={styles.statusText}>Đang tải yêu cầu gần bạn...</Text></View> : error ? (
+          <View style={styles.statusCard}>
+            <Text style={styles.statusTitle}>Không thể tải trang chủ</Text>
+            <Text style={styles.statusText}>{error}</Text>
+            <Pressable accessibilityRole="button" onPress={() => void loadDashboard()} style={({ pressed }) => [styles.retryButton, pressed && styles.pressed]}><Text style={styles.retryText}>Thử lại</Text></Pressable>
+          </View>
+        ) : nearbyRequest ? <View style={styles.requestCard}>
           <View style={styles.requestOwnerRow}>
             <View style={styles.requestAvatar}>
-              <Text style={styles.requestAvatarText}>MH</Text>
+              <Text style={styles.requestAvatarText}>{initials(nearbyRequest.ownerDisplayName)}</Text>
             </View>
             <View style={styles.requestOwnerCopy}>
-              <Text style={styles.requestOwner}>Minh Hà</Text>
-              <Text style={styles.requestMeta}>★ 4.9 · 350m</Text>
+              <Text style={styles.requestOwner}>{nearbyRequest.ownerDisplayName}</Text>
+              <Text style={styles.requestMeta}>★ {nearbyRequest.ownerRatingCount ? nearbyRequest.ownerAverageRating.toFixed(1) : 'Mới'} · {distance(nearbyRequest.distanceMeters)}</Text>
             </View>
             <View style={styles.timePill}>
-              <Text style={styles.timeText}>25 phút</Text>
+              <Text style={styles.timeText}>{deadline(nearbyRequest.deliverBy)}</Text>
             </View>
           </View>
 
-          <Text style={styles.requestTitle}>Bữa cơm chiều cho gia đình</Text>
+          <Text style={styles.requestTitle}>{nearbyRequest.title}</Text>
 
           <View style={styles.items}>
-            <View style={styles.itemChip}>
-              <Text style={styles.itemText}>🥬 Rau muống ×2</Text>
-            </View>
-            <View style={styles.itemChip}>
-              <Text style={styles.itemText}>🥩 Thịt ba chỉ 500g</Text>
-            </View>
-            <View style={styles.itemChip}>
-              <Text style={styles.itemText}>＋ 3 món</Text>
-            </View>
+            {nearbyRequest.items.slice(0, 2).map((item) => <View key={item.id} style={styles.itemChip}><Text style={styles.itemText}>{item.name} {item.quantity.toLocaleString('vi-VN')} {item.unit}</Text></View>)}
+            {nearbyRequest.itemCount > 2 && <View style={styles.itemChip}><Text style={styles.itemText}>＋ {nearbyRequest.itemCount - 2} món</Text></View>}
           </View>
 
           <View style={styles.requestFooter}>
             <View>
               <Text style={styles.feeLabel}>PHÍ ĐI CHỢ</Text>
-              <Text style={styles.fee}>32.000đ</Text>
+              <Text style={styles.fee}>{nearbyRequest.deliveryFee.toLocaleString('vi-VN')}đ</Text>
             </View>
             <Pressable
               accessibilityRole="button"
-              onPress={() => router.push('/requests/81f83d5e-1f7c-4dcb-a221-b487358a16bb')}
+              onPress={() => router.push(`/requests/${nearbyRequest.id}`)}
               style={({ pressed }) => [styles.acceptButton, pressed && styles.pressed]}
             >
               <Text style={styles.acceptLabel}>Nhận đơn</Text>
             </Pressable>
           </View>
-        </View>
+        </View> : <View style={styles.statusCard}><Text style={styles.statusTitle}>Chưa có yêu cầu phù hợp</Text><Text style={styles.statusText}>Thử đổi từ khóa hoặc danh mục nhé.</Text></View>}
       </ScrollView>
     </SafeAreaView>
   );
@@ -426,5 +486,10 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   acceptLabel: { color: colors.forest, fontFamily: fontFamilies.body, fontSize: fontSizes.body },
+  statusCard: { alignItems: 'center', alignSelf: 'center', backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 20, borderWidth: 1, gap: 7, padding: 22, width: '83%' },
+  statusTitle: { color: colors.text, fontFamily: fontFamilies.bodyBold, fontSize: fontSizes.body },
+  statusText: { color: colors.muted, fontFamily: fontFamilies.body, fontSize: fontSizes.bodySmall, textAlign: 'center' },
+  retryButton: { backgroundColor: colors.orange, borderRadius: 10, marginTop: 5, paddingHorizontal: 16, paddingVertical: 9 },
+  retryText: { color: colors.forest, fontFamily: fontFamilies.bodyBold, fontSize: fontSizes.bodySmall },
   pressed: { opacity: 0.65 },
 });
