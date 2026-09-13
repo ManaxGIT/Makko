@@ -6,7 +6,14 @@ from uuid import UUID
 from app.repositories.supabase import SupabaseRepository
 from app.schemas.explore import ExploreItem, ExploreRequest
 from app.schemas.home import HomeDashboard, HomeLocation, HomeProfile
-from app.schemas.orders import OrderActionResult, OrderCounterpart, OrderStatus, OrderSummary
+from app.schemas.orders import (
+    OrderActionResult,
+    OrderCounterpart,
+    OrderStatus,
+    OrderStatusEvent,
+    OrderSummary,
+    OrderTracking,
+)
 
 
 def haversine_meters(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -120,6 +127,69 @@ class MarketplaceService:
             profile=HomeProfile(**profile), location=location, nearby_requests=nearby
         )
 
+    async def get_explore_request(
+        self,
+        request_id: UUID,
+        user_id: UUID,
+        *,
+        latitude: float | None,
+        longitude: float | None,
+    ) -> ExploreRequest:
+        request = await self.repository.select_one(
+            "shopping_requests",
+            params={
+                "select": "id,customer_id,title,description,currency,estimated_items_total,delivery_fee,deliver_by,delivery_ward,delivery_district,delivery_city,delivery_latitude,delivery_longitude,published_at",
+                "id": f"eq.{request_id}",
+                "status": "eq.open",
+                "customer_id": f"neq.{user_id}",
+            },
+        )
+        if request is None:
+            raise LookupError("Request not found")
+
+        profile = await self.repository.select_one(
+            "profiles",
+            params={
+                "select": "id,display_name,avatar_path,average_rating,rating_count,account_status",
+                "id": f"eq.{request['customer_id']}",
+                "account_status": "eq.active",
+            },
+        )
+        if profile is None:
+            raise LookupError("Request not found")
+
+        items = (await self._items([request["id"]])).get(request["id"], [])
+        distance = None
+        if latitude is not None and longitude is not None:
+            distance = haversine_meters(
+                latitude,
+                longitude,
+                float(request["delivery_latitude"]),
+                float(request["delivery_longitude"]),
+            )
+
+        return ExploreRequest(
+            id=request["id"],
+            customer_id=request["customer_id"],
+            owner_display_name=profile["display_name"],
+            owner_avatar_path=profile.get("avatar_path"),
+            owner_average_rating=profile["average_rating"],
+            owner_rating_count=profile["rating_count"],
+            title=request["title"],
+            description=request.get("description"),
+            currency=request["currency"],
+            estimated_items_total=request.get("estimated_items_total"),
+            delivery_fee=request["delivery_fee"],
+            deliver_by=request.get("deliver_by"),
+            delivery_ward=request.get("delivery_ward"),
+            delivery_district=request.get("delivery_district"),
+            delivery_city=request["delivery_city"],
+            published_at=request.get("published_at"),
+            distance_meters=distance,
+            item_count=len(items),
+            items=[ExploreItem(**item) for item in items],
+        )
+
     async def list_orders(self, user_id: UUID, *, limit: int) -> list[OrderSummary]:
         shopper_assignments = await self.repository.select(
             "request_assignments",
@@ -174,12 +244,81 @@ class MarketplaceService:
         done.sort(key=lambda item: item.completed_at or item.cancelled_at or item.created_at, reverse=True)
         return [*active, *done][:limit]
 
+    async def get_order_tracking(self, request_id: UUID, user_id: UUID) -> OrderTracking:
+        request = await self.repository.select_one(
+            "shopping_requests",
+            params={
+                "select": "id,customer_id,status,deliver_by",
+                "id": f"eq.{request_id}",
+            },
+        )
+        if request is None:
+            raise LookupError("Order not found")
+
+        assignment = await self.repository.select_one(
+            "request_assignments",
+            params={
+                "select": "shopper_id,accepted_at,released_at",
+                "request_id": f"eq.{request_id}",
+                "released_at": "is.null",
+            },
+        )
+        current_user_id = str(user_id)
+        is_customer = request["customer_id"] == current_user_id
+        is_shopper = assignment is not None and assignment["shopper_id"] == current_user_id
+        if not is_customer and not is_shopper:
+            raise LookupError("Order not found")
+
+        counterpart_id = (
+            assignment["shopper_id"]
+            if is_customer and assignment
+            else request["customer_id"] if is_shopper else None
+        )
+        profile_rows = await self._profiles([counterpart_id]) if counterpart_id else {}
+        profile = profile_rows.get(counterpart_id) if counterpart_id else None
+        counterpart = OrderCounterpart(
+            id=profile["id"],
+            display_name=profile["display_name"],
+            avatar_path=profile.get("avatar_path"),
+            average_rating=profile["average_rating"],
+            rating_count=profile["rating_count"],
+        ) if profile else None
+
+        history_rows = await self.repository.select(
+            "request_status_history",
+            params={
+                "select": "id,to_status,created_at",
+                "request_id": f"eq.{request_id}",
+                "order": "created_at.asc,id.asc",
+                "limit": "100",
+            },
+        )
+        return OrderTracking(
+            id=request["id"],
+            role="customer" if is_customer else "shopper",
+            status=request["status"],
+            deliver_by=request.get("deliver_by"),
+            counterpart=counterpart,
+            assignment_accepted_at=assignment.get("accepted_at") if assignment else None,
+            status_history=[OrderStatusEvent(**row) for row in history_rows],
+        )
+
     async def accept_request(self, request_id: UUID, access_token: str) -> OrderActionResult:
         await self.repository.rpc_as_user(
             "accept_request", payload={"target_request_id": str(request_id)},
             access_token=access_token,
         )
         return OrderActionResult(request_id=request_id, status="accepted")
+
+    async def release_accepted_request(
+        self, request_id: UUID, access_token: str
+    ) -> OrderActionResult:
+        await self.repository.rpc_as_user(
+            "release_accepted_request",
+            payload={"target_request_id": str(request_id)},
+            access_token=access_token,
+        )
+        return OrderActionResult(request_id=request_id, status="open")
 
     async def publish_request(self, request_id: UUID, access_token: str) -> OrderActionResult:
         await self.repository.rpc_as_user(

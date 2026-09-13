@@ -1,37 +1,106 @@
 import type { ComponentProps } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { colors } from '@/theme/colors';
 import { fontFamilies, fontSizes } from '@/theme/typography';
+import { getOrderTracking, OrderStatus, OrderTracking, releaseOrder } from '@/features/orders/api';
 
 type SymbolName = ComponentProps<typeof SymbolView>['name'];
 type TimelineStatus = 'complete' | 'current' | 'pending';
 
-const timelineSteps: Array<{
+type TimelineStep = {
   description: string;
   status: TimelineStatus;
   title: string;
   message?: string;
-}> = [
-  { title: 'Đã nhận yêu cầu', description: '16:02', status: 'complete' },
-  { title: 'Đã đến chợ Bến Thành', description: '16:18', status: 'complete' },
-  {
-    title: 'Đang chọn hàng',
-    description: 'Chú Tư vừa gửi 1 ảnh',
-    status: 'current',
-    message: '“Rau hôm nay rất tươi nha con!”',
-  },
-  { title: 'Giao đến bạn', description: 'Dự kiến 17:15', status: 'pending' },
-];
+};
+
+const statusLabels: Record<OrderStatus, string> = {
+  draft: 'BẢN NHÁP',
+  open: 'ĐANG TÌM NGƯỜI ĐI CHỢ',
+  accepted: 'ĐÃ NHẬN ĐƠN',
+  shopping: 'ĐANG ĐI CHỢ',
+  delivering: 'ĐANG GIAO HÀNG',
+  completed: 'ĐÃ HOÀN THÀNH',
+  cancelled: 'ĐÃ HỦY',
+  disputed: 'ĐANG XỬ LÝ SỰ CỐ',
+};
+
+const milestoneTitles: Partial<Record<OrderStatus, string>> = {
+  accepted: 'Đã nhận yêu cầu',
+  shopping: 'Đang chọn hàng',
+  delivering: 'Đang giao đến bạn',
+  completed: 'Đã giao hàng',
+};
+
+const milestones: OrderStatus[] = ['accepted', 'shopping', 'delivering', 'completed'];
+
+function formatTime(value: string | null) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? null
+    : date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+}
+
+function initials(name: string) {
+  return name.trim().split(/\s+/).slice(-2).map((part) => part[0]).join('').toUpperCase();
+}
+
+function buildTimeline(order: OrderTracking): TimelineStep[] {
+  const currentIndex = milestones.indexOf(order.status);
+  const eventTimes = new Map(order.statusHistory.map((event) => [event.toStatus, event.createdAt]));
+  if (!eventTimes.has('accepted') && order.assignmentAcceptedAt) {
+    eventTimes.set('accepted', order.assignmentAcceptedAt);
+  }
+
+  const steps = milestones.map((status, index): TimelineStep => {
+    const eventTime = formatTime(eventTimes.get(status) ?? null);
+    const pendingEta = status === 'delivering' ? formatTime(order.deliverBy) : null;
+    return {
+      title: milestoneTitles[status] ?? status,
+      description: eventTime ?? (pendingEta ? `Dự kiến ${pendingEta}` : 'Đang chờ cập nhật'),
+      status: index < currentIndex ? 'complete' : index === currentIndex ? 'current' : 'pending',
+    };
+  });
+
+  if (order.status === 'cancelled' || order.status === 'disputed') {
+    const event = order.statusHistory.find((item) => item.toStatus === order.status);
+    steps.push({
+      title: order.status === 'cancelled' ? 'Đơn đã hủy' : 'Đang xử lý sự cố',
+      description: formatTime(event?.createdAt ?? null) ?? 'Vừa cập nhật',
+      status: 'current',
+    });
+  }
+  return steps;
+}
+
+function trackingHeading(order: OrderTracking) {
+  const name = order.counterpart?.displayName ?? 'Người đi chợ';
+  if (order.role === 'shopper') {
+    if (order.status === 'delivering') return `Bạn đang giao đơn cho ${name}`;
+    if (order.status === 'completed') return `Bạn đã hoàn thành đơn của ${name}`;
+    return `Bạn đang mua giúp ${name}`;
+  }
+  if (order.status === 'accepted') return `${name} đã nhận yêu cầu của bạn`;
+  if (order.status === 'delivering') return `${name} đang giao đến bạn`;
+  if (order.status === 'completed') return `${name} đã giao hàng`;
+  if (order.status === 'cancelled') return 'Đơn hàng đã được hủy';
+  if (order.status === 'disputed') return 'Đơn hàng đang được hỗ trợ';
+  return `${name} đang chọn đồ giúp bạn`;
+}
 
 function AppIcon({ name, color = '#000000', size = 18 }: {
   name: SymbolName;
@@ -121,6 +190,59 @@ function TimelineItem({
 export default function OrderTrackingScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
+  const [order, setOrder] = useState<OrderTracking | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [releasing, setReleasing] = useState(false);
+
+  const loadTracking = useCallback(async () => {
+    if (!id) {
+      setError('Không tìm thấy mã đơn hàng.');
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      setOrder(await getOrderTracking(id));
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : 'Không thể tải trạng thái đơn hàng.');
+    } finally {
+      setLoading(false);
+    }
+  }, [id]);
+
+  useFocusEffect(useCallback(() => { void loadTracking(); }, [loadTracking]));
+  const timelineSteps = useMemo(() => order ? buildTimeline(order) : [], [order]);
+  const counterpartName = order?.counterpart?.displayName ?? 'Chưa có thông tin';
+  const eta = formatTime(order?.deliverBy ?? null);
+
+  const handleRelease = () => {
+    if (!id || releasing) return;
+    Alert.alert(
+      'Hủy nhận đơn?',
+      'Đơn sẽ quay lại danh sách yêu cầu để người khác có thể nhận.',
+      [
+        { text: 'Không', style: 'cancel' },
+        {
+          text: 'Hủy nhận đơn',
+          style: 'destructive',
+          onPress: () => {
+            setReleasing(true);
+            void releaseOrder(id)
+              .then(() => router.replace('/(tabs)/orders'))
+              .catch((releaseError) => {
+                Alert.alert(
+                  'Không thể hủy nhận đơn',
+                  releaseError instanceof Error ? releaseError.message : 'Vui lòng thử lại sau.',
+                );
+              })
+              .finally(() => setReleasing(false));
+          },
+        },
+      ],
+    );
+  };
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
@@ -137,32 +259,49 @@ export default function OrderTrackingScreen() {
         />
       </View>
 
-      <ScrollView
+      {loading ? (
+        <View style={styles.stateContainer}>
+          <ActivityIndicator color={colors.orange} size="large" />
+          <Text style={styles.stateDescription}>Đang tải hành trình đơn hàng...</Text>
+        </View>
+      ) : error || !order ? (
+        <View style={styles.stateContainer}>
+          <Text style={styles.stateTitle}>Không thể tải đơn hàng</Text>
+          <Text style={styles.stateDescription}>{error ?? 'Không tìm thấy dữ liệu đơn hàng.'}</Text>
+          <Pressable accessibilityRole="button" onPress={loadTracking} style={({ pressed }) => [styles.retryButton, pressed && styles.pressed]}>
+            <Text style={styles.retryButtonLabel}>Thử lại</Text>
+          </Pressable>
+        </View>
+      ) : <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.statusSection}>
           <View style={styles.statusPill}>
-            <Text style={styles.statusLabel}>ĐANG ĐI CHỢ</Text>
+            <Text style={styles.statusLabel}>{statusLabels[order.status]}</Text>
           </View>
-          <Text style={styles.heading}>Chú Tư đang chọn{`\n`}đồ giúp bạn</Text>
-          <Text style={styles.eta}>Dự kiến giao lúc 17:15</Text>
+          <Text style={styles.heading}>{trackingHeading(order)}</Text>
+          <Text style={styles.eta}>{eta ? `Dự kiến giao lúc ${eta}` : 'Thời gian giao đang được cập nhật'}</Text>
 
           <View style={styles.shopperCard}>
             <View style={styles.shopperAvatar}>
-              <Text style={styles.shopperAvatarText}>TƯ</Text>
+              <Text style={styles.shopperAvatarText}>{initials(counterpartName)}</Text>
             </View>
             <View style={styles.shopperCopy}>
-              <Text style={styles.shopperName}>Nguyễn Văn Tư</Text>
-              <Text style={styles.shopperMeta}>★ 4.95 · 126 đơn</Text>
+              <Text style={styles.shopperName}>{counterpartName}</Text>
+              <Text style={styles.shopperMeta}>
+                {order.counterpart?.ratingCount
+                  ? `★ ${order.counterpart.averageRating.toFixed(2)} · ${order.counterpart.ratingCount} đánh giá`
+                  : 'Chưa có đánh giá'}
+              </Text>
             </View>
             <View style={styles.contactActions}>
               <RoundButton
-                accessibilityLabel="Gọi cho chú Tư"
+                accessibilityLabel={`Gọi cho ${counterpartName}`}
                 icon={{ ios: 'phone.fill', android: 'call', web: 'call' }}
               />
               <RoundButton
-                accessibilityLabel="Nhắn tin cho chú Tư"
+                accessibilityLabel={`Nhắn tin cho ${counterpartName}`}
                 icon={{ ios: 'envelope.fill', android: 'mail', web: 'mail' }}
               />
             </View>
@@ -181,9 +320,9 @@ export default function OrderTrackingScreen() {
             ))}
           </View>
         </View>
-      </ScrollView>
+      </ScrollView>}
 
-      <View style={styles.footer}>
+      {!loading && order ? <View style={styles.footer}>
         <Pressable
           accessibilityRole="button"
           onPress={() => router.push(`/requests/${id}/details`)}
@@ -191,13 +330,28 @@ export default function OrderTrackingScreen() {
         >
           <Text style={styles.detailButtonLabel}>Xem chi tiết đơn</Text>
         </Pressable>
-      </View>
+        {order.role === 'shopper' && order.status === 'accepted' ? (
+          <Pressable
+            accessibilityRole="button"
+            disabled={releasing}
+            onPress={handleRelease}
+            style={({ pressed }) => [styles.releaseButton, (pressed || releasing) && styles.pressed]}
+          >
+            <Text style={styles.releaseButtonLabel}>{releasing ? 'Đang hủy nhận đơn...' : 'Hủy nhận đơn'}</Text>
+          </Pressable>
+        ) : null}
+      </View> : null}
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   safeArea: { backgroundColor: colors.background, flex: 1 },
+  stateContainer: { alignItems: 'center', flex: 1, gap: 10, justifyContent: 'center', paddingHorizontal: 32 },
+  stateTitle: { color: colors.text, fontFamily: fontFamilies.bodyBold, fontSize: fontSizes.bodyLarge },
+  stateDescription: { color: colors.muted, fontFamily: fontFamilies.body, fontSize: fontSizes.bodySmall, textAlign: 'center' },
+  retryButton: { backgroundColor: colors.forest, borderRadius: 12, marginTop: 6, paddingHorizontal: 22, paddingVertical: 12 },
+  retryButtonLabel: { color: colors.surface, fontFamily: fontFamilies.bodyBold, fontSize: fontSizes.bodySmall },
   header: {
     alignItems: 'center',
     backgroundColor: colors.background,
@@ -351,6 +505,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     borderTopColor: colors.border,
     borderTopWidth: 1,
+    gap: 8,
     paddingHorizontal: 20,
     paddingVertical: 12,
   },
@@ -368,5 +523,7 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.body,
     fontSize: fontSizes.bodySmall,
   },
+  releaseButton: { alignItems: 'center', justifyContent: 'center', minHeight: 40 },
+  releaseButtonLabel: { color: colors.coral, fontFamily: fontFamilies.bodyBold, fontSize: fontSizes.bodySmall },
   pressed: { opacity: 0.65 },
 });

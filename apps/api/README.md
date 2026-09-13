@@ -32,12 +32,16 @@ tables or read-only RPCs directly.
 - `GET /api/v1/health`
 - `GET /api/v1/home`
 - `GET /api/v1/explore`
+- `GET /api/v1/explore/{request_id}`
 - `GET /api/v1/orders`
+- `GET /api/v1/orders/{request_id}/tracking`
 - `POST /api/v1/orders/{request_id}/accept`
+- `POST /api/v1/orders/{request_id}/release`
 - `POST /api/v1/orders/{request_id}/publish`
 - `PATCH /api/v1/orders/{request_id}/status`
 
-The three feature endpoints require `Authorization: Bearer <access-token>`.
+All endpoints except health and OpenAPI documentation require
+`Authorization: Bearer <access-token>`.
 
 ## Run locally
 

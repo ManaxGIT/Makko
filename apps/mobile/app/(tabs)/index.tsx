@@ -288,7 +288,7 @@ export default function HomeScreen() {
             </View>
             <Pressable
               accessibilityRole="button"
-              onPress={() => router.push(`/requests/${nearbyRequest.id}`)}
+              onPress={() => router.push(`/requests/${nearbyRequest.id}/details`)}
               style={({ pressed }) => [styles.acceptButton, pressed && styles.pressed]}
             >
               <Text style={styles.acceptLabel}>Nhận đơn</Text>

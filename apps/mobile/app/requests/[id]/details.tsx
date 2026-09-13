@@ -1,6 +1,8 @@
 import type { ComponentProps } from 'react';
-import { useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -8,22 +10,65 @@ import {
   View,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { colors } from '@/theme/colors';
 import { fontFamilies, fontSizes } from '@/theme/typography';
+import { ExploreRequest, ExploreRequestItem, getExploreRequest } from '@/features/explore/api';
+import { markExploreRequestUnavailable } from '@/features/explore/unavailableRequests';
+import { acceptOrder } from '@/features/orders/api';
 
 type SymbolName = ComponentProps<typeof SymbolView>['name'];
 
-const shoppingItems = [
-  { emoji: '🥬', name: 'Rau muống', note: '2 bó · chọn non', price: '~24.000đ', color: colors.vegetable },
-  { emoji: '🥩', name: 'Thịt ba chỉ', note: '500g · ít mỡ', price: '~75.000đ', color: colors.meat },
-  { emoji: '🥚', name: 'Trứng gà', note: '10 quả', price: '~32.000đ', color: colors.egg },
-  { emoji: '🍅', name: 'Cà chua', note: '500g · chọn chín vừa', price: '~18.000đ', color: colors.softPeach },
-  { emoji: '🥕', name: 'Cà rốt', note: '3 củ', price: '~20.000đ', color: colors.egg },
-];
+const BEN_NGHE_CENTER = { latitude: 10.7798, longitude: 106.7009 };
+const itemColors = [colors.vegetable, colors.meat, colors.egg, colors.softPeach];
+
+type DisplayItem = ExploreRequestItem & { color: string; emoji: string };
+
+function formatQuantity(value: number) {
+  return Number.isInteger(value) ? String(value) : value.toLocaleString('vi-VN');
+}
+
+function formatMoney(value: number, currency = 'VND') {
+  return new Intl.NumberFormat('vi-VN', {
+    currency,
+    maximumFractionDigits: 0,
+    style: 'currency',
+  }).format(value);
+}
+
+function formatDeadline(value: string | null) {
+  if (!value) return 'Thời gian linh hoạt';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Thời gian linh hoạt';
+  return `Giao trước ${date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}`;
+}
+
+function formatDistance(value: number | null, request: ExploreRequest) {
+  if (value === null) {
+    return [request.deliveryWard, request.deliveryDistrict, request.deliveryCity].filter(Boolean).join(', ');
+  }
+  return value < 1000
+    ? `Cách bạn ${Math.round(value / 10) * 10}m`
+    : `Cách bạn ${(value / 1000).toLocaleString('vi-VN', { maximumFractionDigits: 1 })}km`;
+}
+
+function initials(name: string) {
+  return name.trim().split(/\s+/).slice(-2).map((part) => part[0]).join('').toUpperCase();
+}
+
+function itemEmoji(name: string) {
+  const normalized = name.toLocaleLowerCase('vi');
+  if (/thịt|cá|tôm|gà|bò|heo/.test(normalized)) return '🥩';
+  if (/trứng/.test(normalized)) return '🥚';
+  if (/cà rốt|củ/.test(normalized)) return '🥕';
+  if (/cà chua/.test(normalized)) return '🍅';
+  if (/rau|cải/.test(normalized)) return '🥬';
+  if (/cam|táo|xoài|chuối|trái cây/.test(normalized)) return '🍊';
+  return '🧺';
+}
 
 function AppIcon({ name, color = '#000000', size = 18 }: {
   name: SymbolName;
@@ -63,7 +108,7 @@ function ShoppingItem({
   name,
   note,
   price,
-}: (typeof shoppingItems)[number]) {
+}: DisplayItem & { price: string }) {
   return (
     <View style={styles.itemRow}>
       <View style={[styles.itemIcon, { backgroundColor: color }]}>
@@ -81,8 +126,70 @@ function ShoppingItem({
 export default function RequestDetailsScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
+  const [request, setRequest] = useState<ExploreRequest | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [unavailable, setUnavailable] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [accepting, setAccepting] = useState(false);
+
+  const loadRequest = useCallback(async () => {
+    if (!id) {
+      setError('Không tìm thấy mã yêu cầu.');
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    setUnavailable(false);
+    setRequest(null);
+    try {
+      setRequest(await getExploreRequest(id, BEN_NGHE_CENTER));
+    } catch (loadError) {
+      const message = loadError instanceof Error ? loadError.message : '';
+      const requestUnavailable = message === 'Request not found';
+      if (requestUnavailable && id) markExploreRequestUnavailable(id);
+      setUnavailable(requestUnavailable);
+      setError(requestUnavailable
+        ? 'Yêu cầu này vừa được người khác nhận và không còn trong danh sách Khám phá.'
+        : message || 'Không thể tải yêu cầu lúc này.');
+    } finally {
+      setLoading(false);
+    }
+  }, [id]);
+
+  useFocusEffect(useCallback(() => { void loadRequest(); }, [loadRequest]));
+
+  const shoppingItems = useMemo(() => (request?.items ?? []).map((item, index): DisplayItem => ({
+    ...item,
+    color: itemColors[index % itemColors.length],
+    emoji: itemEmoji(item.name),
+  })), [request]);
   const visibleItems = expanded ? shoppingItems : shoppingItems.slice(0, 3);
+
+  const handleAccept = async () => {
+    if (!id || accepting) return;
+    setAccepting(true);
+    try {
+      await acceptOrder(id);
+      markExploreRequestUnavailable(id);
+      router.replace(`/requests/${id}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '';
+      if (message.includes('request_not_available')) {
+        markExploreRequestUnavailable(id);
+        Alert.alert(
+          'Yêu cầu đã có người nhận',
+          'Một người khác đã nhận yêu cầu này trước bạn.',
+          [{ text: 'Quay lại Khám phá', onPress: () => router.back() }],
+        );
+      } else {
+        Alert.alert('Không thể nhận đơn', message || 'Vui lòng thử lại sau.');
+      }
+    } finally {
+      setAccepting(false);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
@@ -99,7 +206,20 @@ export default function RequestDetailsScreen() {
         />
       </View>
 
-      <ScrollView
+      {loading ? (
+        <View style={styles.stateContainer}>
+          <ActivityIndicator color={colors.coral} size="large" />
+          <Text style={styles.stateDescription}>Đang tải chi tiết yêu cầu...</Text>
+        </View>
+      ) : error || !request ? (
+        <View style={styles.stateContainer}>
+          <Text style={styles.stateTitle}>Không thể tải yêu cầu</Text>
+          <Text style={styles.stateDescription}>{error ?? 'Không tìm thấy dữ liệu yêu cầu.'}</Text>
+          <Pressable accessibilityRole="button" onPress={unavailable ? () => router.back() : loadRequest} style={({ pressed }) => [styles.retryButton, pressed && styles.pressed]}>
+            <Text style={styles.retryButtonText}>{unavailable ? 'Quay lại Khám phá' : 'Thử lại'}</Text>
+          </Pressable>
+        </View>
+      ) : <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
@@ -120,11 +240,15 @@ export default function RequestDetailsScreen() {
         <View style={styles.content}>
           <View style={styles.ownerRow}>
             <View style={styles.ownerAvatar}>
-              <Text style={styles.ownerAvatarText}>MH</Text>
+              <Text style={styles.ownerAvatarText}>{initials(request.ownerDisplayName)}</Text>
             </View>
             <View style={styles.ownerCopy}>
-              <Text style={styles.ownerName}>Minh Hà</Text>
-              <Text style={styles.ownerMeta}>★ 4.9 · 18 lượt đánh giá</Text>
+              <Text style={styles.ownerName}>{request.ownerDisplayName}</Text>
+              <Text style={styles.ownerMeta}>
+                {request.ownerRatingCount
+                  ? `★ ${request.ownerAverageRating.toFixed(1)} · ${request.ownerRatingCount} lượt đánh giá`
+                  : 'Chưa có đánh giá'}
+              </Text>
             </View>
             <Pressable
               accessibilityRole="button"
@@ -134,15 +258,15 @@ export default function RequestDetailsScreen() {
             </Pressable>
           </View>
 
-          <Text style={styles.title}>Bữa cơm chiều{`\n`}cho gia đình</Text>
-          <Text selectable style={styles.requestId}>UUID: {id}</Text>
+          <Text style={styles.title}>{request.title}</Text>
+          <Text selectable style={styles.requestId}>UUID: {request.id}</Text>
 
           <View style={styles.metaChips}>
             <View style={styles.metaChip}>
-              <Text style={styles.metaChipText}>◷ Giao trước 17:30</Text>
+              <Text style={styles.metaChipText}>◷ {formatDeadline(request.deliverBy)}</Text>
             </View>
             <View style={styles.metaChip}>
-              <Text style={styles.metaChipText}>⌖ Cách bạn 350m</Text>
+              <Text style={styles.metaChipText}>⌖ {formatDistance(request.distanceMeters, request)}</Text>
             </View>
           </View>
 
@@ -150,44 +274,57 @@ export default function RequestDetailsScreen() {
 
           <View style={styles.listHeader}>
             <Text style={styles.listTitle}>Danh sách cần mua</Text>
-            <Text style={styles.itemCount}>5 món</Text>
+            <Text style={styles.itemCount}>{request.itemCount} món</Text>
           </View>
 
           <View>
-            {visibleItems.map((item) => <ShoppingItem key={item.name} {...item} />)}
+            {visibleItems.map((item) => (
+              <ShoppingItem
+                key={item.id}
+                {...item}
+                note={`${formatQuantity(item.quantity)} ${item.unit}${item.note ? ` · ${item.note}` : ''}`}
+                price={item.estimatedUnitPrice === null ? 'Chưa có giá' : `~${formatMoney(item.estimatedUnitPrice, request.currency)}`}
+              />
+            ))}
           </View>
 
-          <Pressable
+          {shoppingItems.length > 3 ? <Pressable
             accessibilityRole="button"
             onPress={() => setExpanded((current) => !current)}
             style={({ pressed }) => [styles.expandButton, pressed && styles.pressed]}
           >
             <Text style={styles.expandButtonText}>
-              {expanded ? 'Thu gọn⌃' : 'Xem thêm 2 món⌄'}
+              {expanded ? 'Thu gọn⌃' : `Xem thêm ${shoppingItems.length - 3} món⌄`}
             </Text>
-          </Pressable>
+          </Pressable> : null}
         </View>
-      </ScrollView>
+      </ScrollView>}
 
-      <View style={styles.footer}>
+      {!loading && request ? <View style={styles.footer}>
         <View>
           <Text style={styles.rewardLabel}>Bạn nhận được</Text>
-          <Text style={styles.reward}>32.000đ</Text>
+          <Text style={styles.reward}>{formatMoney(request.deliveryFee, request.currency)}</Text>
         </View>
         <Pressable
           accessibilityRole="button"
-          onPress={() => router.replace(`/requests/${id}`)}
-          style={({ pressed }) => [styles.acceptButton, pressed && styles.pressed]}
+          disabled={accepting}
+          onPress={handleAccept}
+          style={({ pressed }) => [styles.acceptButton, (pressed || accepting) && styles.pressed]}
         >
-          <Text style={styles.acceptButtonText}>Nhận đi chợ giúp</Text>
+          <Text style={styles.acceptButtonText}>{accepting ? 'Đang nhận đơn...' : 'Nhận đi chợ giúp'}</Text>
         </Pressable>
-      </View>
+      </View> : null}
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   safeArea: { backgroundColor: colors.background, flex: 1 },
+  stateContainer: { alignItems: 'center', flex: 1, gap: 10, justifyContent: 'center', paddingHorizontal: 32 },
+  stateTitle: { color: colors.text, fontFamily: fontFamilies.bodyBold, fontSize: fontSizes.bodyLarge },
+  stateDescription: { color: colors.muted, fontFamily: fontFamilies.body, fontSize: fontSizes.bodySmall, textAlign: 'center' },
+  retryButton: { backgroundColor: colors.forest, borderRadius: 12, marginTop: 6, paddingHorizontal: 22, paddingVertical: 12 },
+  retryButtonText: { color: colors.surface, fontFamily: fontFamilies.bodyBold, fontSize: fontSizes.bodySmall },
   header: {
     alignItems: 'center',
     backgroundColor: colors.background,

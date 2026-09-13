@@ -31,12 +31,34 @@ export type OrderSummary = {
 
 export type OrderActionResult = { requestId: string; status: OrderStatus };
 
+export type OrderTracking = {
+  id: string;
+  role: 'customer' | 'shopper';
+  status: OrderStatus;
+  deliverBy: string | null;
+  counterpart: OrderSummary['counterpart'];
+  assignmentAcceptedAt: string | null;
+  statusHistory: Array<{
+    id: number;
+    toStatus: OrderStatus;
+    createdAt: string;
+  }>;
+};
+
 export async function listMyOrders(limit = 50): Promise<OrderSummary[]> {
   return apiGet<OrderSummary[]>('/api/v1/orders', { limit });
 }
 
+export function getOrderTracking(requestId: string) {
+  return apiGet<OrderTracking>(`/api/v1/orders/${requestId}/tracking`);
+}
+
 export function acceptOrder(requestId: string) {
   return apiPost<OrderActionResult>(`/api/v1/orders/${requestId}/accept`);
+}
+
+export function releaseOrder(requestId: string) {
+  return apiPost<OrderActionResult>(`/api/v1/orders/${requestId}/release`);
 }
 
 export function publishOrder(requestId: string) {

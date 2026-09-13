@@ -10,6 +10,10 @@ REQUEST_ID = "f1c79ef1-8f60-47bc-aeb8-0f461e4cabcc"
 
 
 class FakeRepository:
+    async def select_one(self, table: str, *, params: dict[str, str]):
+        rows = await self.select(table, params=params)
+        return rows[0] if rows else None
+
     async def select(self, table: str, *, params: dict[str, str]):
         if table == "shopping_requests":
             return [{
@@ -37,6 +41,60 @@ class FakeRepository:
         return []
 
 
+class TrackingRepository:
+    async def select_one(self, table: str, *, params: dict[str, str]):
+        if table == "shopping_requests":
+            return {
+                "id": REQUEST_ID,
+                "customer_id": str(USER_ID),
+                "status": "shopping",
+                "deliver_by": "2026-09-13T10:00:00Z",
+            }
+        if table == "request_assignments":
+            return {
+                "shopper_id": CUSTOMER_ID,
+                "accepted_at": "2026-09-13T08:30:00Z",
+                "released_at": None,
+            }
+        return None
+
+    async def select(self, table: str, *, params: dict[str, str]):
+        if table == "profiles":
+            return [{
+                "id": CUSTOMER_ID,
+                "display_name": "Chú Tư",
+                "avatar_path": None,
+                "average_rating": "4.95",
+                "rating_count": 126,
+                "account_status": "active",
+            }]
+        if table == "request_status_history":
+            return [{
+                "id": 1,
+                "to_status": "shopping",
+                "created_at": "2026-09-13T08:45:00Z",
+            }]
+        return []
+
+
+class OpenOrderTrackingRepository(TrackingRepository):
+    async def select_one(self, table: str, *, params: dict[str, str]):
+        if table == "request_assignments":
+            return None
+        return await super().select_one(table, params=params)
+
+
+class ActionRepository:
+    def __init__(self):
+        self.function = None
+        self.payload = None
+
+    async def rpc_as_user(self, function: str, *, payload: dict, access_token: str):
+        self.function = function
+        self.payload = payload
+        return {"status": "open"}
+
+
 def test_haversine_returns_zero_for_same_point():
     assert haversine_meters(10.78, 106.70, 10.78, 106.70) == 0
 
@@ -53,3 +111,52 @@ async def test_explore_maps_safe_public_response():
     assert results[0].owner_display_name == "Cô Lan"
     assert results[0].items[0].name == "Cam sành"
     assert results[0].distance_meters is not None
+
+
+@pytest.mark.asyncio
+async def test_explore_detail_maps_request_and_items():
+    service = MarketplaceService(FakeRepository())  # type: ignore[arg-type]
+
+    result = await service.get_explore_request(
+        UUID(REQUEST_ID), USER_ID, latitude=10.7798, longitude=106.7009,
+    )
+
+    assert result.id == UUID(REQUEST_ID)
+    assert result.owner_display_name == "Cô Lan"
+    assert result.item_count == 1
+    assert result.items[0].name == "Cam sành"
+
+
+@pytest.mark.asyncio
+async def test_tracking_returns_participant_order_history():
+    service = MarketplaceService(TrackingRepository())  # type: ignore[arg-type]
+
+    tracking = await service.get_order_tracking(UUID(REQUEST_ID), USER_ID)
+
+    assert tracking.role == "customer"
+    assert tracking.status == "shopping"
+    assert tracking.counterpart is not None
+    assert tracking.counterpart.display_name == "Chú Tư"
+    assert tracking.status_history[0].to_status == "shopping"
+
+
+@pytest.mark.asyncio
+async def test_tracking_does_not_return_customer_as_their_own_counterpart():
+    service = MarketplaceService(OpenOrderTrackingRepository())  # type: ignore[arg-type]
+
+    tracking = await service.get_order_tracking(UUID(REQUEST_ID), USER_ID)
+
+    assert tracking.role == "customer"
+    assert tracking.counterpart is None
+
+
+@pytest.mark.asyncio
+async def test_release_accepted_request_uses_transaction_rpc():
+    repository = ActionRepository()
+    service = MarketplaceService(repository)  # type: ignore[arg-type]
+
+    result = await service.release_accepted_request(UUID(REQUEST_ID), "access-token")
+
+    assert repository.function == "release_accepted_request"
+    assert repository.payload == {"target_request_id": REQUEST_ID}
+    assert result.status == "open"

@@ -7,7 +7,7 @@ from app.dependencies.auth import get_current_user
 from app.dependencies.repositories import get_repository
 from app.models.user import CurrentUser
 from app.repositories.supabase import SupabaseRepository
-from app.schemas.orders import OrderActionResult, OrderSummary, TransitionOrderBody
+from app.schemas.orders import OrderActionResult, OrderSummary, OrderTracking, TransitionOrderBody
 from app.services.marketplace import MarketplaceService
 
 router = APIRouter(prefix="/orders", tags=["orders"])
@@ -22,6 +22,15 @@ async def list_orders(
     return await MarketplaceService(repository).list_orders(user.id, limit=limit)
 
 
+@router.get("/{request_id}/tracking", response_model=OrderTracking, response_model_by_alias=True)
+async def get_order_tracking(
+    request_id: UUID,
+    user: Annotated[CurrentUser, Depends(get_current_user)],
+    repository: Annotated[SupabaseRepository, Depends(get_repository)],
+) -> OrderTracking:
+    return await MarketplaceService(repository).get_order_tracking(request_id, user.id)
+
+
 @router.post("/{request_id}/accept", response_model=OrderActionResult, response_model_by_alias=True)
 async def accept_order(
     request_id: UUID,
@@ -29,6 +38,17 @@ async def accept_order(
     repository: Annotated[SupabaseRepository, Depends(get_repository)],
 ) -> OrderActionResult:
     return await MarketplaceService(repository).accept_request(request_id, user.access_token)
+
+
+@router.post("/{request_id}/release", response_model=OrderActionResult, response_model_by_alias=True)
+async def release_order(
+    request_id: UUID,
+    user: Annotated[CurrentUser, Depends(get_current_user)],
+    repository: Annotated[SupabaseRepository, Depends(get_repository)],
+) -> OrderActionResult:
+    return await MarketplaceService(repository).release_accepted_request(
+        request_id, user.access_token
+    )
 
 
 @router.post("/{request_id}/publish", response_model=OrderActionResult, response_model_by_alias=True)

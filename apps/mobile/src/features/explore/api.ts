@@ -50,3 +50,10 @@ export async function listExploreRequests({
     query: query?.trim(), latitude, longitude, limit,
   });
 }
+
+export function getExploreRequest(
+  requestId: string,
+  location?: { latitude: number; longitude: number },
+) {
+  return apiGet<ExploreRequest>(`/api/v1/explore/${requestId}`, location);
+}

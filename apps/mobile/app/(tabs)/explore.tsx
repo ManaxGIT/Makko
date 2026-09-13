@@ -1,11 +1,12 @@
 import type { ComponentProps } from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ExploreRequest, listExploreRequests } from '@/features/explore/api';
+import { clearUnavailableExploreRequests, getUnavailableExploreRequestIds } from '@/features/explore/unavailableRequests';
 import { colors } from '@/theme/colors';
 import { fontFamilies, fontSizes, letterSpacing, lineHeights } from '@/theme/typography';
 
@@ -79,7 +80,7 @@ function Icon({ name, color = colors.forest, size = 20 }: { name: SymbolName; co
 
 function RequestCard({ request }: { request: Request }) {
   const router = useRouter();
-  const openRequest = () => router.push(`/requests/${request.id}`);
+  const openRequest = () => router.push(`/requests/${request.id}/details`);
 
   return (
     <View style={styles.card}>
@@ -121,10 +122,11 @@ export default function ExploreScreen() {
   const [query, setQuery] = useState('');
   const [nearest, setNearest] = useState(true);
   const [requests, setRequests] = useState<ExploreRequest[]>([]);
+  const [unavailableRequestIds, setUnavailableRequestIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const loadRequests = useCallback(async (searchQuery = query) => {
+  const loadRequests = useCallback(async (searchQuery: string) => {
     setLoading(true);
     setError(null);
     try {
@@ -134,21 +136,34 @@ export default function ExploreScreen() {
     } finally {
       setLoading(false);
     }
-  }, [query]);
+  }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => { void loadRequests(query); }, 300);
     return () => clearTimeout(timer);
   }, [loadRequests, query]);
 
+  useFocusEffect(useCallback(() => {
+    setUnavailableRequestIds(getUnavailableExploreRequestIds());
+  }, []));
+
+  const refreshRequests = useCallback(async () => {
+    clearUnavailableExploreRequests();
+    setUnavailableRequestIds(new Set());
+    await loadRequests(query);
+  }, [loadRequests, query]);
+
   const visibleRequests = useMemo(() => {
-    const cards = requests.map(toCardRequest).filter((request) => category === 'Tất cả' || request.category === category);
+    const cards = requests
+      .filter((request) => !unavailableRequestIds.has(request.id))
+      .map(toCardRequest)
+      .filter((request) => category === 'Tất cả' || request.category === category);
     return nearest ? cards : cards.sort((a, b) => {
       const first = requests.find((request) => request.id === a.id)?.publishedAt ?? '';
       const second = requests.find((request) => request.id === b.id)?.publishedAt ?? '';
       return second.localeCompare(first);
     });
-  }, [category, nearest, requests]);
+  }, [category, nearest, requests, unavailableRequestIds]);
 
   return (
     <SafeAreaView edges={['top']} style={styles.safeArea}>
@@ -182,10 +197,15 @@ export default function ExploreScreen() {
 
         <View style={styles.resultsHeader}>
           <View><Text style={styles.resultTitle}>Yêu cầu gần bạn</Text><Text style={styles.resultCount}>{visibleRequests.length} yêu cầu phù hợp</Text></View>
-          <Pressable accessibilityRole="button" onPress={() => setNearest((value) => !value)} style={({ pressed }) => [styles.sortButton, pressed && styles.pressed]}>
-            <Icon color={colors.coral} name={{ ios: 'arrow.up.arrow.down', android: 'sort', web: 'sort' }} size={14} />
-            <Text style={styles.sortText}>{nearest ? 'Gần nhất' : 'Mới nhất'}</Text>
-          </Pressable>
+          <View style={styles.resultActions}>
+            <Pressable accessibilityLabel="Tải lại danh sách yêu cầu" accessibilityRole="button" disabled={loading} onPress={refreshRequests} style={({ pressed }) => [styles.reloadButton, (pressed || loading) && styles.pressed]}>
+              {loading ? <ActivityIndicator color={colors.coral} size="small" /> : <Icon color={colors.coral} name={{ ios: 'arrow.clockwise', android: 'refresh', web: 'refresh' }} size={15} />}
+            </Pressable>
+            <Pressable accessibilityRole="button" onPress={() => setNearest((value) => !value)} style={({ pressed }) => [styles.sortButton, pressed && styles.pressed]}>
+              <Icon color={colors.coral} name={{ ios: 'arrow.up.arrow.down', android: 'sort', web: 'sort' }} size={14} />
+              <Text style={styles.sortText}>{nearest ? 'Gần nhất' : 'Mới nhất'}</Text>
+            </Pressable>
+          </View>
         </View>
 
         <View style={styles.list}>
@@ -193,7 +213,7 @@ export default function ExploreScreen() {
             <View style={styles.emptyState}>
               <Text style={styles.emptyTitle}>Không thể tải yêu cầu</Text>
               <Text style={styles.emptyText}>{error}</Text>
-              <Pressable accessibilityRole="button" onPress={() => void loadRequests()} style={({ pressed }) => [styles.retryButton, pressed && styles.pressed]}><Text style={styles.retryText}>Thử lại</Text></Pressable>
+              <Pressable accessibilityRole="button" onPress={() => void loadRequests(query)} style={({ pressed }) => [styles.retryButton, pressed && styles.pressed]}><Text style={styles.retryText}>Thử lại</Text></Pressable>
             </View>
           ) : visibleRequests.length ? visibleRequests.map((request) => <RequestCard key={request.id} request={request} />) : (
             <View style={styles.emptyState}>
@@ -228,6 +248,8 @@ const styles = StyleSheet.create({
   activeCategoryChip: { backgroundColor: colors.forest, borderColor: colors.forest }, categoryText: { color: colors.text, fontFamily: fontFamilies.body, fontSize: fontSizes.bodySmall }, activeCategoryText: { color: colors.surface, fontFamily: fontFamilies.bodyBold },
   resultsHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', paddingBottom: 10, paddingHorizontal: 20, paddingTop: 3 },
   resultTitle: { color: colors.text, fontFamily: fontFamilies.bodyBold, fontSize: fontSizes.bodyLarge, lineHeight: lineHeights.bodyLarge }, resultCount: { color: colors.muted, fontFamily: fontFamilies.body, fontSize: fontSizes.caption, lineHeight: lineHeights.caption, marginTop: 2 },
+  resultActions: { alignItems: 'center', flexDirection: 'row', gap: 7 },
+  reloadButton: { alignItems: 'center', backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 10, borderWidth: 1, height: 34, justifyContent: 'center', width: 34 },
   sortButton: { alignItems: 'center', backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 10, borderWidth: 1, flexDirection: 'row', gap: 5, paddingHorizontal: 10, paddingVertical: 8 }, sortText: { color: colors.coral, fontFamily: fontFamilies.bodyBold, fontSize: fontSizes.caption },
   list: { gap: 11, paddingHorizontal: 20 }, card: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 18, borderWidth: 1, gap: 10, padding: 15 },
   ownerRow: { alignItems: 'center', flexDirection: 'row' }, avatar: { alignItems: 'center', borderRadius: 12, height: 38, justifyContent: 'center', width: 38 }, avatarText: { fontFamily: fontFamilies.bodyExtraBold, fontSize: fontSizes.bodySmall },

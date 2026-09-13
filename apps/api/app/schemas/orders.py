@@ -38,6 +38,22 @@ class OrderSummary(ApiModel):
     assignment_accepted_at: datetime | None
 
 
+class OrderStatusEvent(ApiModel):
+    id: int
+    to_status: OrderStatus
+    created_at: datetime
+
+
+class OrderTracking(ApiModel):
+    id: UUID
+    role: Literal["customer", "shopper"]
+    status: OrderStatus
+    deliver_by: datetime | None
+    counterpart: OrderCounterpart | None
+    assignment_accepted_at: datetime | None
+    status_history: list[OrderStatusEvent]
+
+
 class TransitionOrderBody(ApiModel):
     status: OrderStatus
 

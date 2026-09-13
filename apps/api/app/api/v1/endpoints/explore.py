@@ -1,4 +1,5 @@
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
 
@@ -25,4 +26,17 @@ async def list_explore_requests(
     return await MarketplaceService(repository).list_explore_requests(
         user.id, query=query, latitude=latitude, longitude=longitude,
         limit=limit, radius_meters=radius_meters,
+    )
+
+
+@router.get("/{request_id}", response_model=ExploreRequest, response_model_by_alias=True)
+async def get_explore_request(
+    request_id: UUID,
+    user: Annotated[CurrentUser, Depends(get_current_user)],
+    repository: Annotated[SupabaseRepository, Depends(get_repository)],
+    latitude: Annotated[float | None, Query(ge=-90, le=90)] = None,
+    longitude: Annotated[float | None, Query(ge=-180, le=180)] = None,
+) -> ExploreRequest:
+    return await MarketplaceService(repository).get_explore_request(
+        request_id, user.id, latitude=latitude, longitude=longitude,
     )
