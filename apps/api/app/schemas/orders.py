@@ -3,6 +3,7 @@ from typing import Literal
 from uuid import UUID
 
 from app.schemas.common import ApiModel
+from app.schemas.explore import ExploreRequest
 
 
 OrderStatus = Literal[
@@ -52,6 +53,11 @@ class OrderTracking(ApiModel):
     counterpart: OrderCounterpart | None
     assignment_accepted_at: datetime | None
     status_history: list[OrderStatusEvent]
+
+
+class OrderDetail(ExploreRequest):
+    role: Literal["customer", "shopper"]
+    status: OrderStatus
 
 
 class TransitionOrderBody(ApiModel):

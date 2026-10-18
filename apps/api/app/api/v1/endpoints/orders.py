@@ -7,7 +7,7 @@ from app.dependencies.auth import get_current_user
 from app.dependencies.repositories import get_repository
 from app.models.user import CurrentUser
 from app.repositories.supabase import SupabaseRepository
-from app.schemas.orders import OrderActionResult, OrderSummary, OrderTracking, TransitionOrderBody
+from app.schemas.orders import OrderActionResult, OrderDetail, OrderSummary, OrderTracking, TransitionOrderBody
 from app.services.marketplace import MarketplaceService
 
 router = APIRouter(prefix="/orders", tags=["orders"])
@@ -29,6 +29,19 @@ async def get_order_tracking(
     repository: Annotated[SupabaseRepository, Depends(get_repository)],
 ) -> OrderTracking:
     return await MarketplaceService(repository).get_order_tracking(request_id, user.id)
+
+
+@router.get("/{request_id}/details", response_model=OrderDetail, response_model_by_alias=True)
+async def get_order_details(
+    request_id: UUID,
+    user: Annotated[CurrentUser, Depends(get_current_user)],
+    repository: Annotated[SupabaseRepository, Depends(get_repository)],
+    latitude: Annotated[float | None, Query(ge=-90, le=90)] = None,
+    longitude: Annotated[float | None, Query(ge=-180, le=180)] = None,
+) -> OrderDetail:
+    return await MarketplaceService(repository).get_order_detail(
+        request_id, user.id, latitude=latitude, longitude=longitude,
+    )
 
 
 @router.post("/{request_id}/accept", response_model=OrderActionResult, response_model_by_alias=True)

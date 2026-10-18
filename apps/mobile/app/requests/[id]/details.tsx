@@ -18,12 +18,17 @@ import { colors } from '@/theme/colors';
 import { fontFamilies, fontSizes } from '@/theme/typography';
 import { ExploreRequest, ExploreRequestItem, getExploreRequest } from '@/features/explore/api';
 import { markExploreRequestUnavailable } from '@/features/explore/unavailableRequests';
-import { acceptOrder } from '@/features/orders/api';
+import { acceptOrder, getOrderDetail, OrderStatus } from '@/features/orders/api';
 
 type SymbolName = ComponentProps<typeof SymbolView>['name'];
 
 const BEN_NGHE_CENTER = { latitude: 10.7798, longitude: 106.7009 };
 const itemColors = [colors.vegetable, colors.meat, colors.egg, colors.softPeach];
+const detailStatusLabels: Record<OrderStatus, string> = {
+  draft: 'Bản nháp', open: 'Đang tìm người đi chợ', accepted: 'Đã có người nhận',
+  shopping: 'Đang đi chợ', delivering: 'Đang giao hàng', completed: 'Đã hoàn thành',
+  cancelled: 'Đã hủy', disputed: 'Đang xử lý sự cố',
+};
 
 type DisplayItem = ExploreRequestItem & { color: string; emoji: string };
 
@@ -130,6 +135,7 @@ export default function RequestDetailsScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [unavailable, setUnavailable] = useState(false);
+  const [participantStatus, setParticipantStatus] = useState<OrderStatus | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [accepting, setAccepting] = useState(false);
 
@@ -142,11 +148,26 @@ export default function RequestDetailsScreen() {
     setLoading(true);
     setError(null);
     setUnavailable(false);
+    setParticipantStatus(null);
     setRequest(null);
     try {
       setRequest(await getExploreRequest(id, BEN_NGHE_CENTER));
     } catch (loadError) {
       const message = loadError instanceof Error ? loadError.message : '';
+      if (message === 'Request not found') {
+        try {
+          const orderDetail = await getOrderDetail(id, BEN_NGHE_CENTER);
+          setRequest(orderDetail);
+          setParticipantStatus(orderDetail.status);
+          return;
+        } catch (orderError) {
+          const orderMessage = orderError instanceof Error ? orderError.message : '';
+          if (orderMessage !== 'Order not found') {
+            setError(orderMessage || 'Không thể tải yêu cầu lúc này.');
+            return;
+          }
+        }
+      }
       const requestUnavailable = message === 'Request not found';
       if (requestUnavailable && id) markExploreRequestUnavailable(id);
       setUnavailable(requestUnavailable);
@@ -233,7 +254,7 @@ export default function RequestDetailsScreen() {
           <View style={[styles.heroCircle, styles.rightCircle]} />
           <Text style={styles.produce}>🥬 🥕 🍅</Text>
           <View style={styles.statusPill}>
-            <Text style={styles.statusText}>Đang tìm người đi chợ</Text>
+            <Text style={styles.statusText}>{participantStatus ? detailStatusLabels[participantStatus] : 'Đang tìm người đi chợ'}</Text>
           </View>
         </LinearGradient>
 
@@ -300,7 +321,7 @@ export default function RequestDetailsScreen() {
         </View>
       </ScrollView>}
 
-      {!loading && request ? <View style={styles.footer}>
+      {!loading && request && !participantStatus ? <View style={styles.footer}>
         <View>
           <Text style={styles.rewardLabel}>Bạn nhận được</Text>
           <Text style={styles.reward}>{formatMoney(request.deliveryFee, request.currency)}</Text>

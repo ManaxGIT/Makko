@@ -6,6 +6,9 @@ Trang `create-request.html` chứa riêng 5 màn hình của luồng Tạo yêu 
 
 Trang `auth.html` chứa riêng 6 màn hình của luồng Đăng nhập và Đăng ký.
 
+Trang `order-tracking.html` chứa thiết kế màn hình Theo dõi đơn dành cho người
+đi chợ, với hành trình 4 giai đoạn và các hành động chuyển bước/huỷ nhận đơn.
+
 ## Xem trên máy
 
 Mở `index.html` trực tiếp trong trình duyệt, hoặc chạy một static server trong thư mục này.

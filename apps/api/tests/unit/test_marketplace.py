@@ -84,6 +84,16 @@ class OpenOrderTrackingRepository(TrackingRepository):
         return await super().select_one(table, params=params)
 
 
+class ParticipantDetailRepository(FakeRepository):
+    async def select_one(self, table: str, *, params: dict[str, str]):
+        if table == "shopping_requests":
+            request = (await self.select(table, params=params))[0]
+            return {**request, "status": "accepted"}
+        if table == "request_assignments":
+            return {"shopper_id": str(USER_ID), "released_at": None}
+        return await super().select_one(table, params=params)
+
+
 class ActionRepository:
     def __init__(self):
         self.function = None
@@ -148,6 +158,20 @@ async def test_tracking_does_not_return_customer_as_their_own_counterpart():
 
     assert tracking.role == "customer"
     assert tracking.counterpart is None
+
+
+@pytest.mark.asyncio
+async def test_order_detail_is_available_to_assigned_shopper():
+    service = MarketplaceService(ParticipantDetailRepository())  # type: ignore[arg-type]
+
+    detail = await service.get_order_detail(
+        UUID(REQUEST_ID), USER_ID, latitude=10.7798, longitude=106.7009,
+    )
+
+    assert detail.role == "shopper"
+    assert detail.status == "accepted"
+    assert detail.owner_display_name == "Cô Lan"
+    assert detail.items[0].name == "Cam sành"
 
 
 @pytest.mark.asyncio

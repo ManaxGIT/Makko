@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   Alert,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -14,8 +15,14 @@ import { SymbolView } from 'expo-symbols';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { colors } from '@/theme/colors';
-import { fontFamilies, fontSizes } from '@/theme/typography';
-import { getOrderTracking, OrderStatus, OrderTracking, releaseOrder } from '@/features/orders/api';
+import { fontFamilies, fontSizes, letterSpacing, lineHeights } from '@/theme/typography';
+import {
+  getOrderTracking,
+  OrderStatus,
+  OrderTracking,
+  releaseOrder,
+  transitionOrder,
+} from '@/features/orders/api';
 
 type SymbolName = ComponentProps<typeof SymbolView>['name'];
 type TimelineStatus = 'complete' | 'current' | 'pending';
@@ -47,6 +54,27 @@ const milestoneTitles: Partial<Record<OrderStatus, string>> = {
 
 const milestones: OrderStatus[] = ['accepted', 'shopping', 'delivering', 'completed'];
 
+const milestoneDescriptions: Partial<Record<OrderStatus, string>> = {
+  accepted: 'Bạn đã nhận đơn và sẵn sàng đi chợ',
+  shopping: 'Kiểm tra đủ món và cập nhật giá',
+  delivering: 'Di chuyển đến địa chỉ giao hàng',
+  completed: 'Xác nhận hoàn tất đơn hàng',
+};
+
+const nextMilestone: Partial<Record<OrderStatus, OrderStatus>> = {
+  accepted: 'shopping',
+  shopping: 'delivering',
+  delivering: 'completed',
+};
+
+const nextActionLabels: Partial<Record<OrderStatus, string>> = {
+  accepted: 'Bắt đầu chọn hàng',
+  shopping: 'Bắt đầu giao hàng',
+  delivering: 'Xác nhận đã giao',
+};
+
+const TRACKING_REFRESH_INTERVAL_MS = 5_000;
+
 function formatTime(value: string | null) {
   if (!value) return null;
   const date = new Date(value);
@@ -71,7 +99,8 @@ function buildTimeline(order: OrderTracking): TimelineStep[] {
     const pendingEta = status === 'delivering' ? formatTime(order.deliverBy) : null;
     return {
       title: milestoneTitles[status] ?? status,
-      description: eventTime ?? (pendingEta ? `Dự kiến ${pendingEta}` : 'Đang chờ cập nhật'),
+      description: milestoneDescriptions[status] ?? 'Đang chờ cập nhật',
+      message: eventTime ?? (pendingEta ? `Dự kiến ${pendingEta}` : undefined),
       status: index < currentIndex ? 'complete' : index === currentIndex ? 'current' : 'pending',
     };
   });
@@ -92,7 +121,9 @@ function trackingHeading(order: OrderTracking) {
   if (order.role === 'shopper') {
     if (order.status === 'delivering') return `Bạn đang giao đơn cho ${name}`;
     if (order.status === 'completed') return `Bạn đã hoàn thành đơn của ${name}`;
-    return `Bạn đang mua giúp ${name}`;
+    return order.status === 'shopping'
+      ? `Bạn đang chọn đồ cho ${name}`
+      : `Bạn đang mua giúp ${name}`;
   }
   if (order.status === 'accepted') return `${name} đã nhận yêu cầu của bạn`;
   if (order.status === 'delivering') return `${name} đang giao đến bạn`;
@@ -176,12 +207,7 @@ function TimelineItem({
       <View style={styles.timelineCopy}>
         <Text style={styles.timelineTitle}>{title}</Text>
         <Text style={styles.timelineDescription}>{description}</Text>
-        {message ? (
-          <View style={styles.messageCard}>
-            <Text style={styles.basket}>🧺</Text>
-            <Text style={styles.message}>{message}</Text>
-          </View>
-        ) : null}
+        {message ? <Text style={styles.timelineMeta}>{message}</Text> : null}
       </View>
     </View>
   );
@@ -193,29 +219,50 @@ export default function OrderTrackingScreen() {
   const [order, setOrder] = useState<OrderTracking | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const [releasing, setReleasing] = useState(false);
+  const [advancing, setAdvancing] = useState(false);
 
-  const loadTracking = useCallback(async () => {
+  const loadTracking = useCallback(async (options?: { silent?: boolean }) => {
+    const silent = options?.silent ?? false;
     if (!id) {
       setError('Không tìm thấy mã đơn hàng.');
       setLoading(false);
       return;
     }
-    setLoading(true);
-    setError(null);
+    if (!silent) {
+      setLoading(true);
+      setError(null);
+    }
     try {
       setOrder(await getOrderTracking(id));
+      setError(null);
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : 'Không thể tải trạng thái đơn hàng.');
+      if (!silent) {
+        setError(loadError instanceof Error ? loadError.message : 'Không thể tải trạng thái đơn hàng.');
+      }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [id]);
 
-  useFocusEffect(useCallback(() => { void loadTracking(); }, [loadTracking]));
+  useFocusEffect(useCallback(() => {
+    void loadTracking();
+    const refreshInterval = setInterval(() => {
+      void loadTracking({ silent: true });
+    }, TRACKING_REFRESH_INTERVAL_MS);
+    return () => clearInterval(refreshInterval);
+  }, [loadTracking]));
   const timelineSteps = useMemo(() => order ? buildTimeline(order) : [], [order]);
   const counterpartName = order?.counterpart?.displayName ?? 'Chưa có thông tin';
   const eta = formatTime(order?.deliverBy ?? null);
+  const currentMilestoneIndex = order ? milestones.indexOf(order.status) : -1;
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadTracking({ silent: true });
+    setRefreshing(false);
+  }, [loadTracking]);
 
   const handleRelease = () => {
     if (!id || releasing) return;
@@ -244,6 +291,24 @@ export default function OrderTrackingScreen() {
     );
   };
 
+  const handleAdvance = async () => {
+    if (!id || !order || advancing) return;
+    const targetStatus = nextMilestone[order.status];
+    if (!targetStatus) return;
+    setAdvancing(true);
+    try {
+      await transitionOrder(id, targetStatus);
+      await loadTracking();
+    } catch (transitionError) {
+      Alert.alert(
+        'Không thể cập nhật giai đoạn',
+        transitionError instanceof Error ? transitionError.message : 'Vui lòng thử lại sau.',
+      );
+    } finally {
+      setAdvancing(false);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
       <View style={styles.header}>
@@ -268,17 +333,30 @@ export default function OrderTrackingScreen() {
         <View style={styles.stateContainer}>
           <Text style={styles.stateTitle}>Không thể tải đơn hàng</Text>
           <Text style={styles.stateDescription}>{error ?? 'Không tìm thấy dữ liệu đơn hàng.'}</Text>
-          <Pressable accessibilityRole="button" onPress={loadTracking} style={({ pressed }) => [styles.retryButton, pressed && styles.pressed]}>
+          <Pressable accessibilityRole="button" onPress={() => { void loadTracking(); }} style={({ pressed }) => [styles.retryButton, pressed && styles.pressed]}>
             <Text style={styles.retryButtonLabel}>Thử lại</Text>
           </Pressable>
         </View>
       ) : <ScrollView
         contentContainerStyle={styles.scrollContent}
+        refreshControl={(
+          <RefreshControl
+            colors={[colors.orange]}
+            onRefresh={handleRefresh}
+            refreshing={refreshing}
+            tintColor={colors.orange}
+          />
+        )}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.statusSection}>
-          <View style={styles.statusPill}>
-            <Text style={styles.statusLabel}>{statusLabels[order.status]}</Text>
+          <View style={styles.statusRow}>
+            <View style={styles.statusPill}>
+              <Text style={styles.statusLabel}>{statusLabels[order.status]}</Text>
+            </View>
+            {currentMilestoneIndex >= 0 ? (
+              <Text style={styles.stageLabel}>GIAI ĐOẠN {currentMilestoneIndex + 1}/4</Text>
+            ) : null}
           </View>
           <Text style={styles.heading}>{trackingHeading(order)}</Text>
           <Text style={styles.eta}>{eta ? `Dự kiến giao lúc ${eta}` : 'Thời gian giao đang được cập nhật'}</Text>
@@ -288,6 +366,9 @@ export default function OrderTrackingScreen() {
               <Text style={styles.shopperAvatarText}>{initials(counterpartName)}</Text>
             </View>
             <View style={styles.shopperCopy}>
+              <Text style={styles.recipientLabel}>
+                {order.role === 'shopper' ? 'GIAO CHO' : 'NGƯỜI ĐI CHỢ'}
+              </Text>
               <Text style={styles.shopperName}>{counterpartName}</Text>
               <Text style={styles.shopperMeta}>
                 {order.counterpart?.ratingCount
@@ -309,7 +390,20 @@ export default function OrderTrackingScreen() {
         </View>
 
         <View style={styles.journeySection}>
-          <Text style={styles.sectionTitle}>Hành trình đơn hàng</Text>
+          <View style={styles.journeyHeadingRow}>
+            <Text style={styles.sectionTitle}>Hành trình đơn hàng</Text>
+            {currentMilestoneIndex >= 0 ? (
+              <Text style={styles.progressLabel}>{currentMilestoneIndex + 1} trên 4</Text>
+            ) : null}
+          </View>
+          <View style={styles.progressBar}>
+            {milestones.map((status, index) => (
+              <View
+                key={status}
+                style={[styles.progressSegment, index <= currentMilestoneIndex && styles.progressSegmentActive]}
+              />
+            ))}
+          </View>
           <View style={styles.timeline}>
             {timelineSteps.map((step, index) => (
               <TimelineItem
@@ -319,6 +413,23 @@ export default function OrderTrackingScreen() {
               />
             ))}
           </View>
+          {order.status === 'shopping' ? (
+            <View style={styles.tipCard}>
+              <View style={styles.tipIcon}>
+                <AppIcon
+                  name={{ ios: 'basket.fill', android: 'shopping_basket', web: 'shopping_basket' }}
+                  color={colors.forest}
+                  size={18}
+                />
+              </View>
+              <View style={styles.tipCopy}>
+                <Text style={styles.tipTitle}>Đang ở bước chọn hàng</Text>
+                <Text style={styles.tipDescription}>
+                  Nhập giá từng món và chụp hoá đơn trước khi bắt đầu giao.
+                </Text>
+              </View>
+            </View>
+          ) : null}
         </View>
       </ScrollView>}
 
@@ -330,15 +441,29 @@ export default function OrderTrackingScreen() {
         >
           <Text style={styles.detailButtonLabel}>Xem chi tiết đơn</Text>
         </Pressable>
-        {order.role === 'shopper' && order.status === 'accepted' ? (
-          <Pressable
-            accessibilityRole="button"
-            disabled={releasing}
-            onPress={handleRelease}
-            style={({ pressed }) => [styles.releaseButton, (pressed || releasing) && styles.pressed]}
-          >
-            <Text style={styles.releaseButtonLabel}>{releasing ? 'Đang hủy nhận đơn...' : 'Hủy nhận đơn'}</Text>
-          </Pressable>
+        {order.role === 'shopper' && nextMilestone[order.status] ? (
+          <View style={styles.actionRow}>
+            {order.status === 'accepted' ? (
+              <Pressable
+                accessibilityRole="button"
+                disabled={releasing || advancing}
+                onPress={handleRelease}
+                style={({ pressed }) => [styles.releaseButton, (pressed || releasing) && styles.pressed]}
+              >
+                <Text style={styles.releaseButtonLabel}>{releasing ? 'Đang hủy...' : 'Hủy nhận đơn'}</Text>
+              </Pressable>
+            ) : null}
+            <Pressable
+              accessibilityRole="button"
+              disabled={advancing || releasing}
+              onPress={handleAdvance}
+              style={({ pressed }) => [styles.advanceButton, (pressed || advancing) && styles.pressed]}
+            >
+              <Text style={styles.advanceButtonLabel}>
+                {advancing ? 'Đang cập nhật...' : `${nextActionLabels[order.status]}  →`}
+              </Text>
+            </Pressable>
+          </View>
         ) : null}
       </View> : null}
     </SafeAreaView>
@@ -383,6 +508,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 28,
   },
+  statusRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
   statusPill: {
     alignSelf: 'flex-start',
     backgroundColor: 'rgba(255,255,255,0.12)',
@@ -394,13 +520,19 @@ const styles = StyleSheet.create({
     color: colors.goldLight,
     fontFamily: fontFamilies.bodyExtraBold,
     fontSize: fontSizes.caption,
-    letterSpacing: 0.7,
+    letterSpacing: letterSpacing.label,
+  },
+  stageLabel: {
+    color: colors.forestLight,
+    fontFamily: fontFamilies.bodyBold,
+    fontSize: fontSizes.caption,
+    letterSpacing: letterSpacing.label,
   },
   heading: {
     color: colors.surface,
     fontFamily: fontFamilies.display,
     fontSize: fontSizes.pageTitle,
-    lineHeight: 29.38,
+    lineHeight: lineHeights.pageTitle,
     marginTop: 9,
   },
   eta: {
@@ -430,7 +562,13 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.bodyExtraBold,
     fontSize: fontSizes.bodySmall,
   },
-  shopperCopy: { gap: 2, marginLeft: 9 },
+  shopperCopy: { flex: 1, gap: 1, marginLeft: 9 },
+  recipientLabel: {
+    color: colors.forestLight,
+    fontFamily: fontFamilies.bodyBold,
+    fontSize: fontSizes.caption,
+    letterSpacing: letterSpacing.label,
+  },
   shopperName: {
     color: colors.surface,
     fontFamily: fontFamilies.bodyBold,
@@ -443,14 +581,19 @@ const styles = StyleSheet.create({
   },
   contactActions: { flexDirection: 'row', gap: 8, marginLeft: 'auto' },
   journeySection: { flex: 1, padding: 20 },
+  journeyHeadingRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
   sectionTitle: {
     color: colors.text,
     fontFamily: fontFamilies.bodyBold,
     fontSize: fontSizes.body,
   },
-  timeline: { marginTop: 17 },
-  timelineItem: { flexDirection: 'row', minHeight: 65 },
-  timelineItemWithMessage: { minHeight: 120 },
+  progressLabel: { color: colors.muted, fontFamily: fontFamilies.bodyBold, fontSize: fontSizes.bodySmall },
+  progressBar: { flexDirection: 'row', gap: 5, marginTop: 12 },
+  progressSegment: { backgroundColor: colors.timelinePending, borderRadius: 99, flex: 1, height: 4 },
+  progressSegmentActive: { backgroundColor: colors.forest },
+  timeline: { marginTop: 18 },
+  timelineItem: { flexDirection: 'row', minHeight: 74 },
+  timelineItemWithMessage: { minHeight: 82 },
   markerColumn: { alignItems: 'center', width: 21 },
   marker: {
     alignItems: 'center',
@@ -487,20 +630,36 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.body,
     fontSize: fontSizes.caption,
   },
-  messageCard: {
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: 12,
-    borderWidth: 1,
-    flexDirection: 'row',
-    marginTop: 7,
-    minHeight: 44,
-    paddingHorizontal: 9,
+  timelineMeta: {
+    color: colors.muted,
+    fontFamily: fontFamilies.body,
+    fontSize: fontSizes.caption,
   },
-  basket: { fontSize: 18, marginRight: 9 },
-  message: { color: colors.text, fontFamily: fontFamilies.body, fontSize: fontSizes.caption },
+  tipCard: {
+    alignItems: 'center',
+    backgroundColor: colors.cream,
+    borderRadius: 14,
+    flexDirection: 'row',
+    gap: 11,
+    marginTop: 2,
+    padding: 12,
+  },
+  tipIcon: {
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    height: 40,
+    justifyContent: 'center',
+    width: 40,
+  },
+  tipCopy: { flex: 1, gap: 2 },
+  tipTitle: { color: colors.text, fontFamily: fontFamilies.bodyBold, fontSize: fontSizes.bodySmall },
+  tipDescription: {
+    color: colors.muted,
+    fontFamily: fontFamilies.body,
+    fontSize: fontSizes.caption,
+    lineHeight: lineHeights.caption,
+  },
   footer: {
     backgroundColor: colors.background,
     borderTopColor: colors.border,
@@ -516,14 +675,38 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     justifyContent: 'center',
-    minHeight: 46,
+    minHeight: 48,
   },
   detailButtonLabel: {
     color: colors.forest,
-    fontFamily: fontFamilies.body,
-    fontSize: fontSizes.bodySmall,
+    fontFamily: fontFamilies.bodyBold,
+    fontSize: fontSizes.body,
   },
-  releaseButton: { alignItems: 'center', justifyContent: 'center', minHeight: 40 },
+  actionRow: { flexDirection: 'row', gap: 10 },
+  releaseButton: {
+    alignItems: 'center',
+    borderColor: colors.coral,
+    borderRadius: 12,
+    borderWidth: 1,
+    flex: 1,
+    justifyContent: 'center',
+    minHeight: 46,
+  },
   releaseButtonLabel: { color: colors.coral, fontFamily: fontFamilies.bodyBold, fontSize: fontSizes.bodySmall },
+  advanceButton: {
+    alignItems: 'center',
+    backgroundColor: colors.forest,
+    borderRadius: 12,
+    flex: 1.35,
+    justifyContent: 'center',
+    minHeight: 46,
+    paddingHorizontal: 10,
+  },
+  advanceButtonLabel: {
+    color: colors.surface,
+    fontFamily: fontFamilies.bodyBold,
+    fontSize: fontSizes.bodySmall,
+    textAlign: 'center',
+  },
   pressed: { opacity: 0.65 },
 });

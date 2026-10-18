@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Makko — Theo dõi đơn dành cho người đi chợ</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=Lora:wght@600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --forest: #213a2f;
+      --forest-soft: #315446;
+      --orange: #f4a261;
+      --orange-pale: #fff0d5;
+      --coral: #d95d39;
+      --paper: #fbf8f0;
+      --white: #ffffff;
+      --ink: #202721;
+      --muted: #788078;
+      --line: #e7e1d5;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-width: 1120px;
+      min-height: 100vh;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 85% 8%, #ffd89c 0, transparent 25%),
+        linear-gradient(135deg, #f5eedf, #ebe5d8);
+      font-family: "Be Vietnam Pro", sans-serif;
+    }
+    button { font: inherit; }
+    .board {
+      display: grid;
+      grid-template-columns: 390px 430px;
+      align-items: center;
+      justify-content: center;
+      gap: 88px;
+      min-height: 100vh;
+      padding: 70px;
+    }
+    .phone {
+      position: relative;
+      width: 390px;
+      height: 844px;
+      overflow: hidden;
+      border: 8px solid #242521;
+      border-radius: 48px;
+      background: var(--paper);
+      box-shadow: 0 26px 70px rgba(55, 46, 28, .18);
+    }
+    .phone::before {
+      content: "";
+      position: absolute;
+      z-index: 20;
+      top: 0;
+      left: 131px;
+      width: 112px;
+      height: 27px;
+      border-radius: 0 0 17px 17px;
+      background: #242521;
+    }
+    .statusbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 41px;
+      padding: 10px 25px 0;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .app { position: relative; height: 787px; overflow: hidden; }
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 61px;
+      padding: 9px 20px;
+      border-bottom: 1px solid var(--line);
+    }
+    .topbar h1 { margin: 0; font-size: 14px; }
+    .round {
+      display: grid;
+      place-items: center;
+      width: 36px;
+      height: 36px;
+      border: 0;
+      border-radius: 12px;
+      background: var(--white);
+      color: var(--forest);
+      font-size: 20px;
+      font-weight: 700;
+    }
+    .hero {
+      padding: 20px 20px 18px;
+      color: var(--white);
+      background: var(--forest);
+    }
+    .hero-top { display: flex; align-items: center; justify-content: space-between; }
+    .badge {
+      padding: 6px 9px;
+      border-radius: 999px;
+      color: #ffd58e;
+      background: rgba(255,255,255,.11);
+      font-size: 8px;
+      font-weight: 800;
+      letter-spacing: .1em;
+    }
+    .step-count { color: #bfcfc7; font-size: 8px; font-weight: 600; }
+    .hero h2 {
+      margin: 11px 0 4px;
+      font-family: Lora, serif;
+      font-size: 25px;
+      line-height: 1.18;
+      letter-spacing: -.02em;
+    }
+    .eta { margin: 0; color: #c8d5ce; font-size: 9px; }
+    .customer {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      margin-top: 14px;
+      padding: 10px;
+      border-radius: 14px;
+      background: rgba(255,255,255,.09);
+    }
+    .avatar {
+      display: grid;
+      place-items: center;
+      width: 36px;
+      height: 36px;
+      border-radius: 11px;
+      color: var(--forest);
+      background: #ffe1ca;
+      font-size: 10px;
+      font-weight: 800;
+    }
+    .customer-copy { display: grid; gap: 2px; }
+    .customer-copy small { color: #bfcfc7; font-size: 7px; }
+    .customer-copy b { font-size: 9px; }
+    .contact { display: flex; gap: 6px; margin-left: auto; }
+    .contact button {
+      display: grid;
+      place-items: center;
+      width: 31px;
+      height: 31px;
+      border: 0;
+      border-radius: 9px;
+      background: var(--white);
+      color: var(--forest);
+      font-size: 13px;
+    }
+    .journey { padding: 18px 20px 150px; }
+    .journey-head { display: flex; align-items: end; justify-content: space-between; }
+    .journey h3 { margin: 0; font-size: 14px; }
+    .journey-head span { color: var(--coral); font-size: 8px; font-weight: 700; }
+    .progress {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 5px;
+      margin: 12px 0 18px;
+    }
+    .progress i { height: 4px; border-radius: 999px; background: #ddd9d0; }
+    .progress i.complete { background: var(--forest); }
+    .progress i.current { background: var(--orange); }
+    .timeline { list-style: none; margin: 0; padding: 0; }
+    .timeline li {
+      position: relative;
+      display: grid;
+      grid-template-columns: 30px 1fr auto;
+      gap: 10px;
+      min-height: 62px;
+    }
+    .timeline li::before {
+      content: "";
+      position: absolute;
+      top: 26px;
+      bottom: 0;
+      left: 14px;
+      width: 1px;
+      background: #dcd7cd;
+    }
+    .timeline li:last-child::before { display: none; }
+    .marker {
+      z-index: 1;
+      display: grid;
+      place-items: center;
+      width: 29px;
+      height: 29px;
+      border: 2px solid #d6d2c9;
+      border-radius: 50%;
+      color: #aaa79f;
+      background: var(--paper);
+      font-size: 9px;
+      font-style: normal;
+      font-weight: 800;
+    }
+    .complete .marker { border-color: var(--forest); color: white; background: var(--forest); }
+    .current .marker {
+      border-color: var(--orange);
+      color: var(--orange);
+      background: #fffaf1;
+      box-shadow: 0 0 0 5px #fde5be;
+    }
+    .timeline-copy { display: grid; align-content: start; gap: 3px; padding-top: 3px; }
+    .timeline-copy b { font-size: 10px; }
+    .timeline-copy small { color: var(--muted); font-size: 8px; }
+    .stage-time { padding-top: 4px; color: #9ba09a; font-size: 7px; }
+    .current-card {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      grid-column: 2 / 4;
+      margin: -17px 0 12px;
+      padding: 9px 11px;
+      border: 1px solid #eadfce;
+      border-radius: 12px;
+      background: var(--white);
+    }
+    .current-card span { font-size: 16px; }
+    .current-card p { margin: 0; font-size: 7px; line-height: 1.45; }
+    .current-card b { color: var(--coral); }
+    .actions {
+      position: absolute;
+      z-index: 10;
+      right: 0;
+      bottom: 0;
+      left: 0;
+      padding: 10px 20px 14px;
+      border-top: 1px solid var(--line);
+      background: rgba(251,248,240,.97);
+      box-shadow: 0 -10px 28px rgba(46, 44, 35, .06);
+    }
+    .detail-link {
+      display: block;
+      width: 100%;
+      margin: 0 0 9px;
+      border: 0;
+      color: var(--forest);
+      background: transparent;
+      font-size: 8px;
+      font-weight: 700;
+    }
+    .action-row { display: grid; grid-template-columns: 112px 1fr; gap: 8px; }
+    .cancel, .next {
+      height: 43px;
+      border-radius: 12px;
+      font-size: 9px;
+      font-weight: 700;
+    }
+    .cancel { border: 1px solid #e7b9aa; color: var(--coral); background: var(--white); }
+    .next { border: 0; color: var(--forest); background: var(--orange); }
+    .next:disabled { color: #8c918c; background: #e7e3da; }
+    .notes .eyebrow { margin: 0; color: var(--coral); font-size: 10px; font-weight: 800; letter-spacing: .14em; }
+    .notes h1 { margin: 10px 0 16px; font-family: Lora, serif; font-size: 42px; line-height: 1.08; }
+    .notes > p { max-width: 390px; color: #667068; font-size: 13px; line-height: 1.7; }
+    .specs { display: grid; gap: 10px; margin-top: 30px; }
+    .spec {
+      display: grid;
+      grid-template-columns: 35px 1fr;
+      gap: 12px;
+      padding: 14px;
+      border: 1px solid rgba(56,60,53,.08);
+      border-radius: 15px;
+      background: rgba(255,255,255,.55);
+    }
+    .spec > span { display: grid; place-items: center; width: 35px; height: 35px; border-radius: 11px; background: var(--orange-pale); color: var(--coral); font-weight: 800; }
+    .spec b { display: block; margin-bottom: 3px; font-size: 12px; }
+    .spec small { color: #737a74; font-size: 10px; line-height: 1.5; }
+    @media (max-width: 900px) {
+      body { min-width: 0; }
+      .board { grid-template-columns: 390px; gap: 50px; padding: 35px 12px 60px; }
+      .notes { width: 390px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="board">
+    <article class="phone" aria-label="Màn hình theo dõi đơn dành cho người đi chợ">
+      <div class="statusbar"><span>9:41</span><span>● ● ▰</span></div>
+      <div class="app">
+        <header class="topbar"><button class="round" aria-label="Quay lại">‹</button><h1>Theo dõi đơn</h1><button class="round" aria-label="Trợ giúp">?</button></header>
+        <section class="hero">
+          <div class="hero-top"><span class="badge" id="statusBadge">ĐANG CHỌN HÀNG</span><span class="step-count" id="stepCount">GIAI ĐOẠN 2/4</span></div>
+          <h2 id="heroTitle">Bạn đang chọn đồ<br>cho Minh Hà</h2>
+          <p class="eta" id="heroSubtitle">Dự kiến bắt đầu giao lúc 17:00</p>
+          <div class="customer">
+            <div class="avatar">MH</div>
+            <div class="customer-copy"><small>GIAO CHO</small><b>Minh Hà · ★ 4.90</b></div>
+            <div class="contact"><button aria-label="Gọi điện">☎</button><button aria-label="Nhắn tin">✉</button></div>
+          </div>
+        </section>
+        <section class="journey">
+          <div class="journey-head"><h3>Hành trình đơn hàng</h3><span id="progressLabel">2 trên 4</span></div>
+          <div class="progress" id="progressBar"><i class="complete"></i><i class="current"></i><i></i><i></i></div>
+          <ol class="timeline" id="timeline">
+            <li class="complete"><i class="marker">✓</i><div class="timeline-copy"><b>Đã nhận yêu cầu</b><small>Bạn đã nhận đơn từ Minh Hà</small></div><time class="stage-time">16:02</time></li>
+            <li class="current"><i class="marker">●</i><div class="timeline-copy"><b>Đang chọn hàng</b><small>Kiểm tra đủ món và cập nhật giá</small></div><time class="stage-time">Hiện tại</time></li>
+            <li><i class="marker">3</i><div class="timeline-copy"><b>Đang giao đến bạn</b><small>Di chuyển đến địa chỉ giao hàng</small></div><time class="stage-time">Dự kiến 17:00</time></li>
+            <li><i class="marker">4</i><div class="timeline-copy"><b>Đã giao hàng</b><small>Xác nhận hoàn tất đơn hàng</small></div><time class="stage-time">Dự kiến 17:15</time></li>
+          </ol>
+          <div class="current-card"><span>🧺</span><p><b>Đang ở bước chọn hàng</b><br>Nhập giá từng món và chụp hoá đơn trước khi bắt đầu giao.</p></div>
+        </section>
+        <footer class="actions">
+          <button class="detail-link">Xem chi tiết đơn →</button>
+          <div class="action-row"><button class="cancel">Huỷ nhận đơn</button><button class="next" id="nextButton">Bắt đầu giao hàng&nbsp; →</button></div>
+        </footer>
+      </div>
+    </article>
+
+    <aside class="notes">
+      <p class="eyebrow">MAKKO · ORDER TRACKING</p>
+      <h1>Một hành trình rõ ràng,<br>một thao tác mỗi bước.</h1>
+      <p>Màn hình ưu tiên hành động tiếp theo của người đi chợ, nhưng vẫn giữ lối thoát an toàn và quyền truy cập chi tiết đơn.</p>
+      <div class="specs">
+        <div class="spec"><span>4</span><div><b>Bốn giai đoạn nhất quán</b><small>Đã nhận yêu cầu → Đang chọn hàng → Đang giao đến bạn → Đã giao hàng.</small></div></div>
+        <div class="spec"><span>→</span><div><b>Một CTA chính theo ngữ cảnh</b><small>Nhãn nút tự mô tả chính xác giai đoạn tiếp theo, không dùng từ chung chung.</small></div></div>
+        <div class="spec"><span>!</span><div><b>Huỷ nhận đơn là hành động phụ</b><small>Màu cảnh báo và viền nhẹ giúp dễ tìm nhưng tránh bấm nhầm.</small></div></div>
+      </div>
+    </aside>
+  </main>
+  <script>
+    const stages = [
+      { badge: 'ĐÃ NHẬN YÊU CẦU', count: 'GIAI ĐOẠN 1/4', title: 'Bạn đã nhận đơn<br>của Minh Hà', subtitle: 'Hãy bắt đầu chọn hàng khi bạn đã sẵn sàng', button: 'Bắt đầu chọn hàng  →' },
+      { badge: 'ĐANG CHỌN HÀNG', count: 'GIAI ĐOẠN 2/4', title: 'Bạn đang chọn đồ<br>cho Minh Hà', subtitle: 'Dự kiến bắt đầu giao lúc 17:00', button: 'Bắt đầu giao hàng  →' },
+      { badge: 'ĐANG GIAO HÀNG', count: 'GIAI ĐOẠN 3/4', title: 'Bạn đang giao đồ<br>đến Minh Hà', subtitle: 'Dự kiến giao hàng lúc 17:15', button: 'Xác nhận đã giao  →' },
+      { badge: 'ĐÃ GIAO HÀNG', count: 'GIAI ĐOẠN 4/4', title: 'Đơn hàng đã được<br>giao thành công', subtitle: 'Cảm ơn bạn đã giúp một người hàng xóm', button: 'Đơn đã hoàn tất' },
+    ];
+    let current = 1;
+    const next = document.getElementById('nextButton');
+    next.addEventListener('click', () => {
+      current = Math.min(current + 1, stages.length - 1);
+      const stage = stages[current];
+      document.getElementById('statusBadge').textContent = stage.badge;
+      document.getElementById('stepCount').textContent = stage.count;
+      document.getElementById('heroTitle').innerHTML = stage.title;
+      document.getElementById('heroSubtitle').textContent = stage.subtitle;
+      document.getElementById('progressLabel').textContent = `${current + 1} trên 4`;
+      [...document.querySelectorAll('#progressBar i')].forEach((item, index) => item.className = index < current ? 'complete' : index === current ? 'current' : '');
+      [...document.querySelectorAll('#timeline li')].forEach((item, index) => item.className = index < current ? 'complete' : index === current ? 'current' : '');
+      next.textContent = stage.button;
+      next.disabled = current === stages.length - 1;
+    });
+  </script>
+</body>
+</html>

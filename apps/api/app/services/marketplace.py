@@ -9,6 +9,7 @@ from app.schemas.home import HomeDashboard, HomeLocation, HomeProfile
 from app.schemas.orders import (
     OrderActionResult,
     OrderCounterpart,
+    OrderDetail,
     OrderStatus,
     OrderStatusEvent,
     OrderSummary,
@@ -301,6 +302,76 @@ class MarketplaceService:
             counterpart=counterpart,
             assignment_accepted_at=assignment.get("accepted_at") if assignment else None,
             status_history=[OrderStatusEvent(**row) for row in history_rows],
+        )
+
+    async def get_order_detail(
+        self,
+        request_id: UUID,
+        user_id: UUID,
+        *,
+        latitude: float | None,
+        longitude: float | None,
+    ) -> OrderDetail:
+        request = await self.repository.select_one(
+            "shopping_requests",
+            params={
+                "select": "id,customer_id,title,description,status,currency,estimated_items_total,delivery_fee,deliver_by,delivery_ward,delivery_district,delivery_city,delivery_latitude,delivery_longitude,published_at",
+                "id": f"eq.{request_id}",
+            },
+        )
+        if request is None:
+            raise LookupError("Order not found")
+
+        assignment = await self.repository.select_one(
+            "request_assignments",
+            params={
+                "select": "shopper_id,released_at",
+                "request_id": f"eq.{request_id}",
+                "released_at": "is.null",
+            },
+        )
+        current_user_id = str(user_id)
+        is_customer = request["customer_id"] == current_user_id
+        is_shopper = assignment is not None and assignment["shopper_id"] == current_user_id
+        if not is_customer and not is_shopper:
+            raise LookupError("Order not found")
+
+        profile = await self.repository.select_one(
+            "profiles",
+            params={
+                "select": "id,display_name,avatar_path,average_rating,rating_count,account_status",
+                "id": f"eq.{request['customer_id']}",
+                "account_status": "eq.active",
+            },
+        )
+        if profile is None:
+            raise LookupError("Order not found")
+
+        items = (await self._items([request["id"]])).get(request["id"], [])
+        distance = None
+        if latitude is not None and longitude is not None:
+            distance = haversine_meters(
+                latitude,
+                longitude,
+                float(request["delivery_latitude"]),
+                float(request["delivery_longitude"]),
+            )
+
+        return OrderDetail(
+            id=request["id"], customer_id=request["customer_id"],
+            owner_display_name=profile["display_name"],
+            owner_avatar_path=profile.get("avatar_path"),
+            owner_average_rating=profile["average_rating"],
+            owner_rating_count=profile["rating_count"], title=request["title"],
+            description=request.get("description"), currency=request["currency"],
+            estimated_items_total=request.get("estimated_items_total"),
+            delivery_fee=request["delivery_fee"], deliver_by=request.get("deliver_by"),
+            delivery_ward=request.get("delivery_ward"),
+            delivery_district=request.get("delivery_district"),
+            delivery_city=request["delivery_city"], published_at=request.get("published_at"),
+            distance_meters=distance, item_count=len(items),
+            items=[ExploreItem(**item) for item in items],
+            role="customer" if is_customer else "shopper", status=request["status"],
         )
 
     async def accept_request(self, request_id: UUID, access_token: str) -> OrderActionResult:

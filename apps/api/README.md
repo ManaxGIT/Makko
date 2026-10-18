@@ -35,6 +35,7 @@ tables or read-only RPCs directly.
 - `GET /api/v1/explore/{request_id}`
 - `GET /api/v1/orders`
 - `GET /api/v1/orders/{request_id}/tracking`
+- `GET /api/v1/orders/{request_id}/details`
 - `POST /api/v1/orders/{request_id}/accept`
 - `POST /api/v1/orders/{request_id}/release`
 - `POST /api/v1/orders/{request_id}/publish`

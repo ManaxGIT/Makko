@@ -1,4 +1,5 @@
 import { apiGet, apiPatch, apiPost } from '@/lib/api';
+import type { ExploreRequest } from '@/features/explore/api';
 
 export type OrderStatus =
   | 'draft' | 'open' | 'accepted' | 'shopping'
@@ -45,12 +46,24 @@ export type OrderTracking = {
   }>;
 };
 
+export type OrderDetail = ExploreRequest & {
+  role: 'customer' | 'shopper';
+  status: OrderStatus;
+};
+
 export async function listMyOrders(limit = 50): Promise<OrderSummary[]> {
   return apiGet<OrderSummary[]>('/api/v1/orders', { limit });
 }
 
 export function getOrderTracking(requestId: string) {
   return apiGet<OrderTracking>(`/api/v1/orders/${requestId}/tracking`);
+}
+
+export function getOrderDetail(
+  requestId: string,
+  location?: { latitude: number; longitude: number },
+) {
+  return apiGet<OrderDetail>(`/api/v1/orders/${requestId}/details`, location);
 }
 
 export function acceptOrder(requestId: string) {
