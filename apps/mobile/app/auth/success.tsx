@@ -21,7 +21,7 @@ export default function AuthSuccessScreen() {
         <View style={styles.actionsCard}>
           <Pressable onPress={() => router.replace('/(tabs)/explore')} style={styles.actionRow}><Text style={styles.number}>1</Text><Text style={styles.actionLabel}>Khám phá yêu cầu gần bạn</Text><Text style={styles.chevron}>›</Text></Pressable>
           <View style={styles.divider} />
-          <Pressable onPress={() => router.replace('/(tabs)/create')} style={styles.actionRow}><Text style={styles.number}>2</Text><Text style={styles.actionLabel}>Tạo yêu cầu đầu tiên</Text><Text style={styles.chevron}>›</Text></Pressable>
+          <Pressable onPress={() => router.push('/create/items')} style={styles.actionRow}><Text style={styles.number}>2</Text><Text style={styles.actionLabel}>Tạo yêu cầu đầu tiên</Text><Text style={styles.chevron}>›</Text></Pressable>
         </View>
         <View style={styles.footer}>
           <PrimaryButton onPress={() => router.replace('/(tabs)/explore')}>Khám phá Makko</PrimaryButton>

@@ -200,7 +200,7 @@ export default function HomeScreen() {
             backgroundColor={colors.forest}
             icon={{ ios: 'plus', android: 'add', web: 'add' }}
             iconBackground="rgba(255,255,255,0.15)"
-            onPress={() => router.push('/(tabs)/create')}
+            onPress={() => router.push('/create/items')}
             subtitle="Nhờ người gần bạn"
             textColor={colors.surface}
             title="Tạo yêu cầu"

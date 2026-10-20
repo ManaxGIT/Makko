@@ -1,6 +1,6 @@
 import type { ComponentProps } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { Tabs } from 'expo-router';
+import { Tabs, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -23,6 +23,7 @@ const TAB_ICONS: Record<string, SymbolName> = {
 
 export function AppTabBar({ state, descriptors, navigation }: TabBarProps) {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
 
   if (state.routes[state.index]?.name === 'create') {
     return null;
@@ -52,7 +53,8 @@ export function AppTabBar({ state, descriptors, navigation }: TabBarProps) {
             });
 
             if (!isFocused && !event.defaultPrevented) {
-              navigation.navigate(route.name, route.params);
+              if (isCreate) router.push('/create/items');
+              else navigation.navigate(route.name, route.params);
             }
           };
 

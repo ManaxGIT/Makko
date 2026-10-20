@@ -11,6 +11,8 @@ import {
   useFonts as useLoraFonts,
 } from '@expo-google-fonts/lora';
 
+import { CreateRequestProvider } from '@/features/create-request/CreateRequestProvider';
+
 import { AuthProvider } from '@/features/auth/AuthProvider';
 
 export default function RootLayout() {
@@ -27,8 +29,10 @@ export default function RootLayout() {
 
   return (
     <AuthProvider>
-      <StatusBar style="dark" />
-      <Stack screenOptions={{ headerShown: false }} />
+      <CreateRequestProvider>
+        <StatusBar style="dark" />
+        <Stack screenOptions={{ headerShown: false }} />
+      </CreateRequestProvider>
     </AuthProvider>
   );
 }

@@ -2,14 +2,24 @@
 
 Bộ giao diện mobile 390 × 844 px, gồm 10 màn hình. Riêng chức năng Tạo yêu cầu có luồng hoàn chỉnh 5 màn hình: Thông tin cơ bản, Danh sách món, Giao hàng & chi phí, Kiểm tra lại và Xác nhận thành công.
 
-Trang `create-request.html` chứa riêng 5 màn hình của luồng Tạo yêu cầu để xem và import độc lập vào Figma.
+Trang `create-request.html` là prototype tương tác mới gồm 3 bước: chọn món,
+giao hàng & chi phí, kiểm tra và đăng; có trạng thái thành công mô phỏng.
+Không lưu nháp và không gửi dữ liệu lên hệ thống. Luồng 5 màn hình cũ vẫn ở `index.html?flow=create`.
 
 Trang `auth.html` chứa riêng 6 màn hình của luồng Đăng nhập và Đăng ký.
 
 Trang `order-tracking.html` chứa thiết kế màn hình Theo dõi đơn dành cho người
 đi chợ, với hành trình 4 giai đoạn và các hành động chuyển bước/huỷ nhận đơn.
 
+Trang `create-request-flow.html` hiển thị đồng thời bốn màn hình của luồng đăng
+yêu cầu để duyệt toàn bộ thiết kế. Mỗi khung vẫn có thể thao tác thử.
+
 ## Xem trên máy
+
+Trang `receipt.html` là prototype xác nhận hàng đã mua: nhập thành tiền từng món,
+đánh dấu món không mua được, tự cộng tiền hàng và tách riêng phí đi chợ.
+Ảnh hóa đơn là tùy chọn. Giá điền sẵn là dữ liệu minh họa để duyệt giao diện. Xem tại `http://localhost:4173/receipt.html`.
+Biểu mẫu chỉ kiểm tra dữ liệu trong trình duyệt, chưa lưu dữ liệu lên hệ thống.
 
 Mở `index.html` trực tiếp trong trình duyệt, hoặc chạy một static server trong thư mục này.
 
