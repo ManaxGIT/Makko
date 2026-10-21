@@ -28,6 +28,7 @@ class OrderAddressSnapshot(ApiModel):
 
 
 class EditableRequest(ApiModel):
+    title: str
     id: UUID
     updated_at: datetime
     items: list[EditRequestItem]

@@ -77,6 +77,8 @@ export function CreateRequestScreen({ step }: { step: 1 | 2 | 3 | 4 }) {
   async function proceed() {
     setError('');
     if (step === 1) {
+      const titleLength = Array.from((form.title ?? '').trim()).length;
+      if (titleLength && (titleLength < 3 || titleLength > 120)) { setError('Tiêu đề cần từ 3 đến 120 ký tự.'); return; }
       if (!form.items.length) { setError('Thêm ít nhất một món để tiếp tục.'); return; }
       router.push(route('delivery'));
     } else if (step === 2) {
@@ -107,6 +109,8 @@ export function CreateRequestScreen({ step }: { step: 1 | 2 | 3 | 4 }) {
       <Text style={s.eyebrow}>{['DANH SÁCH ĐI CHỢ', 'GIAO HÀNG & CHI PHÍ', 'KIỂM TRA LẠI', 'ĐÃ ĐĂNG YÊU CẦU'][step - 1]}</Text>
       <Text style={[s.heading, step === 4 && s.center]}>{heading}</Text><Text style={[s.description, step === 4 && s.center]}>{intro}</Text>
       {step === 1 && <>
+        <Field label="Tiêu đề yêu cầu · Không bắt buộc" value={form.title ?? ''} onChangeText={title => patch({ title })} maxLength={120} placeholder="Ví dụ: Trái cây cho cả nhà" />
+        <Text style={s.small}>Để trống để tự đặt tiêu đề từ các món. Nếu nhập, dùng từ 3 đến 120 ký tự.</Text>
         <View style={s.sectionRow}><Text style={s.bold}>Món cần mua</Text><Text style={s.bold}>{form.items.length} món</Text></View>
         {form.items.map(i => <View key={i.id} style={[s.card, s.row]}><View style={s.cart}><Text style={s.cartText}>🛒</Text></View><View style={s.flex}><Text style={s.bold}>{i.name}</Text><Text style={s.small}>{i.quantity} {i.unit}{i.note ? ` · ${i.note}` : ''}</Text></View><Action label="Sửa" onPress={() => openItem(i)} /><Action label="Xóa" danger onPress={() => patch({ items: form.items.filter(row => row.id !== i.id) })} /></View>)}
         {!form.items.length && <Text style={s.description}>Danh sách còn trống. Thêm món đầu tiên bên dưới.</Text>}
@@ -128,6 +132,7 @@ export function CreateRequestScreen({ step }: { step: 1 | 2 | 3 | 4 }) {
         <Field label="Lưu ý giao hàng · Không bắt buộc" value={form.deliveryNote} onChangeText={deliveryNote => patch({ deliveryNote })} multiline placeholder="Ví dụ: Gọi mình khi đến sảnh." maxLength={500} />
       </>}
       {step === 3 && <>
+        <View style={s.card}><Text style={s.bold}>Tiêu đề yêu cầu</Text><Text style={s.description}>{(form.title ?? '').trim() || `Đi chợ: ${form.items.map(item => item.name.trim()).join(', ')}`.slice(0, 120)}</Text></View>
         <View style={s.sectionRow}><Text style={s.bold}>Món cần mua</Text><Action disabled={requestLocked} label="Sửa" onPress={() => router.dismissTo(route('items'))} /></View>
         <View style={s.card}>{form.items.map(i => <View key={i.id} style={s.reviewItem}><Text style={s.bold}>{i.name} · {i.quantity} {i.unit}</Text>{!!i.note && <Text style={s.description}>{i.note}</Text>}<Text style={s.small}>{i.allowSubstitution ? 'Có thể mua loại tương tự' : 'Không tự thay loại khác'}</Text></View>)}</View>
         <View style={s.sectionRow}><Text style={s.bold}>Thông tin giao hàng</Text><Action disabled={requestLocked} label="Sửa" onPress={() => router.dismissTo(route('delivery'))} /></View>

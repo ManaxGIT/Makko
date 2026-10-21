@@ -45,7 +45,7 @@ def test_edit_requires_authentication(api):
 class ReadRepository:
     def __init__(self, status='open'):
         self.row = {
-            'id': ID, 'status': status, 'updated_at': '2026-10-21T00:00:00Z',
+            'id': ID, 'title': 'Trái cây cho cả nhà', 'status': status, 'updated_at': '2026-10-21T00:00:00Z',
             'delivery_phone': '0901234567', 'delivery_line1': 'Original street', 'delivery_line2': None,
             'delivery_ward': 'Original ward', 'delivery_district': None, 'delivery_city': 'Original city',
             'deliver_by': BODY['deliverBy'], 'estimated_items_total': None, 'delivery_fee': 25000,
@@ -91,6 +91,20 @@ def test_edit_read_http_uses_camel_case(api):
     result = client.get(f'/api/v1/orders/{ID}/edit')
     assert result.status_code == 200
     data = result.json()
+    assert data['title'] == 'Trái cây cho cả nhà'
     assert data['updatedAt'] and data['address']['recipientPhone'] == '0901234567'
     assert data['items'][0]['allowSubstitution'] is True
     assert 'customerId' not in data
+
+
+def test_edit_without_title_preserves_legacy_contract(api):
+    client, repo, _ = api
+    assert client.patch(f'/api/v1/orders/{ID}', json=EDIT).status_code == 200
+    assert 'title' not in repo.calls[0][1]['p_request']
+
+
+@pytest.mark.parametrize('title,expected', [('  Bữa sáng cả nhà  ','Bữa sáng cả nhà'), (' ',None)])
+def test_edit_title_or_clear_to_automatic(api, title, expected):
+    client, repo, _ = api
+    assert client.patch(f'/api/v1/orders/{ID}', json={**EDIT, 'title': title}).status_code == 200
+    assert repo.calls[0][1]['p_request']['title'] == expected

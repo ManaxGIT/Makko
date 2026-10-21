@@ -102,3 +102,17 @@ def test_post_requires_authentication(api):
     del app.dependency_overrides[get_current_user]
     assert client.post('/api/v1/orders', json=BODY).status_code == 401
     assert not repo.calls
+
+
+@pytest.mark.parametrize('title,expected', [(None,None), ('',None), ('   ',None), ('  Trái cây cho cả nhà  ','Trái cây cho cả nhà'), ('a'*120,'a'*120)])
+def test_optional_title_is_normalized(api, title, expected):
+    client, repo, _ = api
+    assert client.post('/api/v1/orders', json={**BODY, 'title': title}).status_code == 201
+    assert repo.calls[0][1]['p_request']['title'] == expected
+
+
+@pytest.mark.parametrize('title', ['ab', 'a'*121, 123])
+def test_invalid_title_is_rejected(api, title):
+    client, repo, _ = api
+    assert client.post('/api/v1/orders', json={**BODY, 'title': title}).status_code == 422
+    assert not repo.calls

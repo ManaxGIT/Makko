@@ -20,7 +20,7 @@ class EditRequestService:
         if row['status'] not in ('draft', 'open'):
             raise HTTPException(409, 'Đơn đã được nhận hoặc kết thúc, không thể chỉnh sửa.')
         return EditableRequest(
-            id=row['id'], updated_at=row['updated_at'],
+            id=row['id'], title=row['title'], updated_at=row['updated_at'],
             items=[{key: item.get(key) for key in ('id', 'name', 'quantity', 'unit', 'note', 'allow_substitution')}
                    for item in sorted(row['request_items'], key=lambda item: item['sort_order'])],
             address={key: row[f'delivery_{key}'] for key in ('line1', 'line2', 'ward', 'district', 'city')} | {'recipient_phone': row['delivery_phone']},
@@ -29,9 +29,12 @@ class EditRequestService:
         )
 
     async def update(self, request_id: UUID, body: EditRequestBody, token: str) -> OrderActionResult:
+        payload = body.model_dump(mode='json')
+        if 'title' not in body.model_fields_set:
+            payload.pop('title', None)  # Older clients cannot overwrite an existing custom title.
         try:
             result = await self.repository.rpc_as_user('update_shopping_request', payload={
-                'target_request_id': str(request_id), 'p_request': body.model_dump(mode='json'),
+                'target_request_id': str(request_id), 'p_request': payload,
             }, access_token=token)
         except SupabaseError as error:
             errors = {

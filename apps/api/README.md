@@ -141,7 +141,8 @@ ISO-8601 `deliverBy` with timezone, `deliveryFee`, `paymentMethod` (`cash` or
 `bank_transfer`), optional `estimatedItemsTotal` and `deliveryNote`.
 Each item contains `name`, positive `quantity` (up to 3 decimal places), `unit`,
 optional `note` and `allowSubstitution`. The list must contain 1–100 items.
-The title is derived from item names; no extra title input is required.
+Optional `title` accepts 3–120 characters after trimming. Omitted, null or blank
+titles on creation are derived from item names.
 
 The response is `201` with `{ "requestId": "<uuid>", "status": "open" }`.
 A replay returns the same request ID and its current status. Scope keys to one
@@ -187,3 +188,10 @@ new order or publishes a draft. Concurrent acceptance or stale edits are rejecte
 The mobile editor reuses the three-step request form; only the final **Lưu thay đổi**
 updates the order. Saving an account address remains a separate immediate action.
 Run `supabase/tests/update_shopping_request.sql` for rollback-only database checks.
+
+
+Apply `optional_request_title` after `update_shopping_request` to enable user titles.
+The editor returns the stored title and allows changing it. Sending a null/blank
+edit title regenerates it from the submitted items; omitting the field preserves
+the current title for older clients. Existing rows are not renamed by migration.
+Run `supabase/tests/optional_request_title.sql` for rollback-only title checks.

@@ -8,10 +8,10 @@ import type { OrderActionResult } from '@/features/orders/api';
 import { useAuth } from '@/features/auth/AuthProvider';
 
 export type RequestItem = { id: string; name: string; quantity: string; unit: string; note: string; allowSubstitution: boolean };
-export type RequestForm = DeliveryAddress & { originalDeliverBy?: string | null; items: RequestItem[]; day: 'today' | 'tomorrow'; time: string; budget: string; fee: string; payment: 'cash' | 'bank_transfer'; deliveryNote: string };
+export type RequestForm = DeliveryAddress & { title: string; originalDeliverBy?: string | null; items: RequestItem[]; day: 'today' | 'tomorrow'; time: string; budget: string; fee: string; payment: 'cash' | 'bank_transfer'; deliveryNote: string };
 // Start with an empty shopping list; this flow publishes real requests.
 const initialForm = (): RequestForm => ({
-  items: [], phone: '', line1: '', province: null, ward: null, day: 'today', time: '18:00', budget: '', fee: '25000', payment: 'cash', deliveryNote: '',
+  title: '', items: [], phone: '', line1: '', province: null, ward: null, day: 'today', time: '18:00', budget: '', fee: '25000', payment: 'cash', deliveryNote: '',
 });
 type FormContext = {
   form: RequestForm;
@@ -91,7 +91,7 @@ function AccountRequestProvider({ children, userId, editId }: PropsWithChildren<
       editVersion.current = data.updatedAt;
       originalItemIds.current = new Set(data.items.map(i => i.id));
       const date = data.deliverBy ? new Date(data.deliverBy) : null;
-      setForm({ ...initialForm(), items: data.items.map(i => ({ ...i, quantity: String(i.quantity), note: i.note ?? '' })),
+      setForm({ ...initialForm(), title: data.title, items: data.items.map(i => ({ ...i, quantity: String(i.quantity), note: i.note ?? '' })),
         phone: data.address.recipientPhone, line1: data.address.line1, orderAddress: data.address,
         originalDeliverBy: data.deliverBy, time: date ? `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}` : '18:00',
         budget: data.estimatedItemsTotal === null ? '' : String(data.estimatedItemsTotal), fee: String(data.deliveryFee),

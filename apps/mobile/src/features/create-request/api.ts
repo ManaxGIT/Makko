@@ -5,6 +5,7 @@ import type { RequestForm } from './CreateRequestProvider';
 
 export type CreateRequestBody = {
   submissionKey: string;
+  title: string | null;
   addressId: string | null;
   items: Array<{ name: string; quantity: string; unit: string; note: string | null; allowSubstitution: boolean }>;
   deliverBy: string;
@@ -15,6 +16,8 @@ export type CreateRequestBody = {
 };
 
 export function buildRequestBody(form: RequestForm, submissionKey: string, now = new Date(), editing = false): CreateRequestBody {
+  const title = (form.title ?? '').trim();
+  if (title && (Array.from(title).length < 3 || Array.from(title).length > 120)) throw new Error('Tiêu đề cần từ 3 đến 120 ký tự.');
   if (!form.savedAddress?.id && !(editing && form.orderAddress)) throw new Error('Vui lòng lưu địa chỉ nhận hàng trước khi đăng.');
   if (!form.items.length || form.items.length > 100) throw new Error('Danh sách cần có từ 1 đến 100 món.');
   const items = form.items.map(item => {
@@ -32,7 +35,7 @@ export function buildRequestBody(form: RequestForm, submissionKey: string, now =
   if (target.getTime() <= now.getTime()) throw new Error('Giờ giao đã qua. Chọn giờ muộn hơn hoặc ngày mai.');
   if (!/^\d{1,10}$/.test(form.fee) || (form.budget && !/^\d{1,10}$/.test(form.budget))) throw new Error('Tiền hàng và phí đi chợ phải là số tiền hợp lệ.');
   return {
-    submissionKey, addressId: form.savedAddress?.id ?? null, items, deliverBy: target.toISOString(),
+    submissionKey, title: title || null, addressId: form.savedAddress?.id ?? null, items, deliverBy: target.toISOString(),
     estimatedItemsTotal: form.budget || null, deliveryFee: form.fee,
     paymentMethod: form.payment, deliveryNote: form.deliveryNote.trim() || null,
   };
@@ -43,7 +46,7 @@ export function createAndPublishRequest(body: CreateRequestBody, userId: string)
 }
 
 export type EditableRequest = {
-  id: string; updatedAt: string; address: OrderAddressSnapshot;
+  id: string; title: string; updatedAt: string; address: OrderAddressSnapshot;
   items: Array<{ id: string; name: string; quantity: string; unit: string; note: string | null; allowSubstitution: boolean }>;
   deliverBy: string | null; estimatedItemsTotal: number | null; deliveryFee: number;
   paymentMethod: 'cash' | 'bank_transfer'; deliveryNote: string | null;
