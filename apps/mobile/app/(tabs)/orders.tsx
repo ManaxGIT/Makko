@@ -126,12 +126,13 @@ function OrderCard({
       ) : (
         <View style={styles.waitingFooter}>
           <Text style={styles.postedTime}>◷ Đã đăng {relativeTime(order.publishedAt ?? order.createdAt)}</Text>
-          <Pressable
+          {isWaiting && order.role === 'customer' && <Pressable
             accessibilityRole="button"
+            onPress={() => router.push(`/edit/${order.id}/items`)}
             style={({ pressed }) => [styles.editButton, pressed && styles.pressed]}
           >
             <Text style={styles.editButtonText}>Chỉnh sửa</Text>
-          </Pressable>
+          </Pressable>}
         </View>
       )}
     </View>

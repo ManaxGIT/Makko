@@ -14,8 +14,8 @@ class HomeLocation(ApiModel):
     ward: str | None
     district: str | None
     city: str
-    latitude: float
-    longitude: float
+    latitude: float | None
+    longitude: float | None
 
 
 class HomeDashboard(ApiModel):

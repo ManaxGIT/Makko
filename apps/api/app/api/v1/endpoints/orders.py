@@ -9,8 +9,40 @@ from app.models.user import CurrentUser
 from app.repositories.supabase import SupabaseRepository
 from app.schemas.orders import OrderActionResult, OrderDetail, OrderSummary, OrderTracking, TransitionOrderBody
 from app.services.marketplace import MarketplaceService
+from app.services.create_request import CreateRequestService
+from app.schemas.create_request import CreateRequestBody
+from app.schemas.edit_request import EditableRequest, EditRequestBody
+from app.services.edit_request import EditRequestService
 
 router = APIRouter(prefix="/orders", tags=["orders"])
+
+
+@router.get("/{request_id}/edit", response_model=EditableRequest, response_model_by_alias=True)
+async def get_editable_order(
+    request_id: UUID,
+    user: Annotated[CurrentUser, Depends(get_current_user)],
+    repository: Annotated[SupabaseRepository, Depends(get_repository)],
+) -> EditableRequest:
+    return await EditRequestService(repository).get(request_id, user.id)
+
+
+@router.patch("/{request_id}", response_model=OrderActionResult, response_model_by_alias=True)
+async def update_order(
+    request_id: UUID,
+    body: EditRequestBody,
+    user: Annotated[CurrentUser, Depends(get_current_user)],
+    repository: Annotated[SupabaseRepository, Depends(get_repository)],
+) -> OrderActionResult:
+    return await EditRequestService(repository).update(request_id, body, user.access_token)
+
+
+@router.post("", response_model=OrderActionResult, response_model_by_alias=True, status_code=201)
+async def create_and_publish_order(
+    body: CreateRequestBody,
+    user: Annotated[CurrentUser, Depends(get_current_user)],
+    repository: Annotated[SupabaseRepository, Depends(get_repository)],
+) -> OrderActionResult:
+    return await CreateRequestService(repository).create_and_publish(body, user.access_token)
 
 
 @router.get("", response_model=list[OrderSummary], response_model_by_alias=True)

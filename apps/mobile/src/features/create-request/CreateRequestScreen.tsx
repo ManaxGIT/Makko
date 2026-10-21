@@ -1,17 +1,18 @@
-import { useRef, useState } from 'react';
-import { Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, TextInputProps, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useCallback, useRef, useState } from 'react';
+import { BackHandler, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, TextInputProps, View } from 'react-native';
+import { Href, Redirect, Stack, useFocusEffect, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '@/theme/colors';
 import { fontFamilies, fontSizes, letterSpacing, lineHeights } from '@/theme/typography';
 import { RequestItem, useCreateRequest } from './CreateRequestProvider';
+import { DeliveryAddress, DeliveryAddressFields, formatDeliveryAddress, isDeliveryAddressComplete } from './DeliveryAddressFields';
 
 const money = (value: string | number) => `${Number(value || 0).toLocaleString('vi-VN')}đ`;
 const moneyInput = (value: string) => value ? Number(value).toLocaleString('vi-VN') : '';
 const units = ['kg', 'gram', 'bó', 'quả', 'hộp', 'gói', 'chai', 'con'];
-function Action({ label, onPress, danger = false }: { label: string; onPress: () => void; danger?: boolean }) {
-  return <Pressable accessibilityRole="button" onPress={onPress} style={s.action}><Text style={[s.actionText, danger && s.danger]}>{label}</Text></Pressable>;
+function Action({ label, onPress, danger = false, disabled = false }: { label: string; onPress: () => void; danger?: boolean; disabled?: boolean }) {
+  return <Pressable accessibilityRole="button" onPress={onPress} disabled={disabled} accessibilityState={{ disabled }} style={[s.action, disabled && { opacity: 0.5 }]}><Text style={[s.actionText, danger && s.danger]}>{label}</Text></Pressable>;
 }
 function Field({ label, ...props }: TextInputProps & { label: string }) {
   return <View style={s.field}><Text style={s.label}>{label}</Text><TextInput accessibilityLabel={label} placeholderTextColor={colors.mutedLight} {...props} style={[s.input, props.multiline && s.multiline, props.style]} /></View>;
@@ -21,17 +22,41 @@ function Choice({ label, selected, onPress }: { label: string; selected: boolean
 }
 export function CreateRequestScreen({ step }: { step: 1 | 2 | 3 | 4 }) {
   const router = useRouter();
-  const { form, patch, reset } = useCreateRequest();
+  const { editId, editLoading, editError, reloadEdit, form, patch, reset, addressLoading, addressError, savingAddress, reloadAddress, saveDeliveryAddress, publishRequest, publishing, requestLocked, publishedRequest } = useCreateRequest();
+  const route = (page: string) => (editId ? `/edit/${editId}/${page}` : `/create/${page}`) as Href;
   const [item, setItem] = useState<RequestItem | null>(null);
   const [customUnit, setCustomUnit] = useState(false);
   const [addressOpen, setAddressOpen] = useState(false);
-  const [address, setAddress] = useState({ recipient: '', phone: '', address: '' });
+  const [address, setAddress] = useState<DeliveryAddress>({ phone: '', line1: '', province: null, ward: null });
   const [error, setError] = useState('');
   const [modalError, setModalError] = useState('');
   const nextId = useRef(0);
+  useFocusEffect(useCallback(() => {
+    if (step === 1 && publishedRequest) reset();
+  }, [step, publishedRequest, reset]));
+  useFocusEffect(useCallback(() => {
+    if (!requestLocked) return;
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => true);
+    return () => subscription.remove();
+  }, [requestLocked]));
+  function closeEditor() {
+    if (savingAddress) return;
+    setItem(null); setAddressOpen(false);
+  }
+  async function saveEditor() {
+    if (item) { saveItem(); return; }
+    setModalError('');
+    try {
+      await saveDeliveryAddress(address);
+      setError(''); setAddressOpen(false);
+    } catch (error) {
+      setModalError(error instanceof Error ? error.message : 'Không lưu được địa chỉ. Vui lòng thử lại.');
+    }
+  }
   function goBack() {
+    if (requestLocked) return;
     if (router.canGoBack()) router.back();
-    else router.replace(step === 3 ? '/create/delivery' : step === 2 ? '/create/items' : '/(tabs)');
+    else router.replace(step === 3 ? route('delivery') : step === 2 ? route('items') : editId ? '/(tabs)/orders' : '/(tabs)');
   }
   function openItem(existing?: RequestItem) {
     setModalError('');
@@ -49,30 +74,37 @@ export function CreateRequestScreen({ step }: { step: 1 | 2 | 3 | 4 }) {
     patch({ items: form.items.some(i => i.id === item.id) ? form.items.map(i => i.id === item.id ? saved : i) : [...form.items, saved] });
     setItem(null); setError('');
   }
-  function proceed() {
+  async function proceed() {
     setError('');
     if (step === 1) {
       if (!form.items.length) { setError('Thêm ít nhất một món để tiếp tục.'); return; }
-      router.push('/create/delivery');
+      router.push(route('delivery'));
     } else if (step === 2) {
-      if (!form.recipient.trim() || !form.address.trim() || form.phone.replace(/\D/g, '').length < 9) { setError('Vui lòng bổ sung đầy đủ thông tin người nhận và địa chỉ.'); return; }
+      if (!isDeliveryAddressComplete(form)) { setError('Chọn tỉnh/thành, xã/phường và nhập số nhà, tên đường, số điện thoại liên hệ.'); return; }
       if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(form.time)) { setError('Nhập giờ giao theo định dạng HH:mm, ví dụ 18:00.'); return; }
       if (!form.fee || !Number.isFinite(Number(form.fee))) { setError('Vui lòng nhập phí đi chợ.'); return; }
-      router.push('/create/review');
+      router.push(route('review'));
     } else if (step === 3) {
-      if (!form.items.length) { router.dismissTo('/create/items'); return; }
-      // This supplied design is a UI preview. Do not report a real publish without an API response.
-      router.push('/create/success');
-    } else { reset(); router.dismissTo('/create/items'); }
+      if (!form.items.length) { router.dismissTo(route('items')); return; }
+      try {
+        await publishRequest();
+        if (editId) router.dismissTo('/(tabs)/orders');
+        else router.replace('/create/success');
+      } catch (error) {
+        setError(error instanceof Error ? error.message : 'Không đăng được yêu cầu. Vui lòng thử lại.');
+      }
+    } else { reset(); router.dismissTo(route('items')); }
   }
-  const heading = ['Hôm nay mua gì?', 'Giao đến bạn.', 'Sẵn sàng nhờ đi chợ?', 'Đang tìm người\nđi chợ giúp bạn.'][step - 1];
-  const intro = ['Thêm những món bạn cần, Makko giúp bạn kết nối với người đi chợ.', 'Chọn nơi nhận và thời gian bạn cần hàng.', 'Kiểm tra một lượt trước khi đăng yêu cầu.', 'Khi có người nhận, bạn có thể theo dõi tiến trình của yêu cầu.'][step - 1];
-  return <SafeAreaView style={s.safe} edges={['top', 'bottom']}><KeyboardAvoidingView style={s.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-    <View style={s.header}>{step < 4 && <Pressable accessibilityRole="button" accessibilityLabel="Quay lại" onPress={goBack} hitSlop={7} style={({ pressed }) => [s.backButton, pressed && { opacity: 0.62 }]}><SymbolView name={{ ios: 'chevron.left', android: 'chevron_left', web: 'chevron_left' }} size={19} tintColor="#000000" /></Pressable>}<Text style={s.headerTitle}>Đăng yêu cầu</Text><Text style={s.small}>{step === 4 ? 'Hoàn tất' : `Bước ${step} / 3`}</Text></View>
+  if (editId && (editLoading || editError)) return <SafeAreaView style={s.safe}><View style={s.content}><Action label="Quay lại Đơn hàng" onPress={() => router.dismissTo('/(tabs)/orders')} /><Text style={s.description}>{editLoading ? 'Đang tải đơn hàng…' : editError}</Text>{!!editError && <Action label="Thử tải lại" onPress={reloadEdit} />}</View></SafeAreaView>;
+  if (step === 4 && !publishedRequest) return <Redirect href="/create/items" />;
+  const heading = ['Hôm nay mua gì?', 'Giao đến bạn.', editId ? 'Kiểm tra thay đổi.' : 'Sẵn sàng nhờ đi chợ?', 'Đã đăng yêu cầu.'][step - 1];
+  const intro = ['Thêm những món bạn cần, Makko giúp bạn kết nối với người đi chợ.', 'Chọn nơi nhận và thời gian bạn cần hàng.', editId ? 'Kiểm tra thông tin trước khi lưu vào đơn hiện tại.' : 'Kiểm tra một lượt trước khi đăng yêu cầu.', 'Bạn có thể theo dõi người nhận và tiến trình trong Đơn hàng.'][step - 1];
+  return <SafeAreaView style={s.safe} edges={['top', 'bottom']}><Stack.Screen options={{ gestureEnabled: !requestLocked }} /><KeyboardAvoidingView style={s.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <View style={s.header}>{step < 4 && <Pressable accessibilityRole="button" accessibilityLabel="Quay lại" onPress={goBack} disabled={requestLocked} hitSlop={7} style={({ pressed }) => [s.backButton, pressed && { opacity: 0.62 }]}><SymbolView name={{ ios: 'chevron.left', android: 'chevron_left', web: 'chevron_left' }} size={19} tintColor="#000000" /></Pressable>}<Text style={s.headerTitle}>{editId ? 'Chỉnh sửa yêu cầu' : 'Đăng yêu cầu'}</Text><Text style={s.small}>{step === 4 ? 'Hoàn tất' : `Bước ${step} / 3`}</Text></View>
     <View style={s.progress}>{[1, 2, 3].map(i => <View key={i} style={[s.segment, i <= step && s.activeSegment]} />)}</View>
     <ScrollView style={s.flex} contentContainerStyle={[s.content, step === 4 && s.successContent]} keyboardShouldPersistTaps="handled">
       {step === 4 && <View style={s.successIcon}><Text style={s.check}>✓</Text></View>}
-      <Text style={s.eyebrow}>{['DANH SÁCH ĐI CHỢ', 'GIAO HÀNG & CHI PHÍ', 'KIỂM TRA LẠI', 'XEM TRƯỚC SAU KHI ĐĂNG'][step - 1]}</Text>
+      <Text style={s.eyebrow}>{['DANH SÁCH ĐI CHỢ', 'GIAO HÀNG & CHI PHÍ', 'KIỂM TRA LẠI', 'ĐÃ ĐĂNG YÊU CẦU'][step - 1]}</Text>
       <Text style={[s.heading, step === 4 && s.center]}>{heading}</Text><Text style={[s.description, step === 4 && s.center]}>{intro}</Text>
       {step === 1 && <>
         <View style={s.sectionRow}><Text style={s.bold}>Món cần mua</Text><Text style={s.bold}>{form.items.length} món</Text></View>
@@ -80,12 +112,14 @@ export function CreateRequestScreen({ step }: { step: 1 | 2 | 3 | 4 }) {
         {!form.items.length && <Text style={s.description}>Danh sách còn trống. Thêm món đầu tiên bên dưới.</Text>}
         <Pressable accessibilityRole="button" onPress={() => openItem()} style={s.add}><Text style={s.bold}>＋ Thêm món</Text></Pressable>
         <View style={s.soft}><Text style={s.bold}>Không biết giá? Không sao.</Text><Text style={s.description}>Bạn chỉ cần ghi món và số lượng. Có thể điền tiền hàng dự kiến cho cả giỏ ở bước tiếp theo.</Text></View>
-        <Text style={s.small}>Dữ liệu minh họa để thử giao diện. Chưa tạo yêu cầu thật.</Text>
+
       </>}
       {step === 2 && <>
-        <View style={s.sectionRow}><Text style={s.bold}>Địa chỉ nhận</Text><Action label="Thay đổi" onPress={() => { setAddress({ recipient: form.recipient, phone: form.phone, address: form.address }); setModalError(''); setAddressOpen(true); }} /></View>
-        <View style={s.card}><Text style={s.bold}>{form.recipient || 'Chưa có người nhận'}{form.phone ? ` · ${form.phone}` : ''}</Text><Text style={s.description}>{form.address || 'Chọn Thay đổi để nhập địa chỉ'}</Text><Text style={s.small}>Thông tin chỉ dùng cho yêu cầu đang nhập, chưa lưu lên hệ thống</Text></View>
-        <Text style={s.label}>Ngày nhận</Text><View style={s.row}><Choice label="Hôm nay" selected={form.day === 'today'} onPress={() => patch({ day: 'today' })} /><Choice label="Ngày mai" selected={form.day === 'tomorrow'} onPress={() => patch({ day: 'tomorrow' })} /></View>
+        <View style={s.sectionRow}><Text style={s.bold}>Địa chỉ nhận</Text><Action disabled={requestLocked} label="Thay đổi" onPress={() => { setAddress({ phone: form.phone, line1: form.line1, province: form.province, ward: form.ward, savedAddress: form.savedAddress }); setModalError(''); setAddressOpen(true); }} /></View>
+        <View style={s.card}><Text style={s.bold}>{form.phone || 'Chưa có số điện thoại liên hệ'}</Text><Text style={s.description}>{formatDeliveryAddress(form) || 'Chọn Thay đổi để nhập địa chỉ'}</Text><Text style={s.small}>{form.savedAddress ? 'Địa chỉ đã lưu · Tự dùng cho lần sau' : form.orderAddress ? 'Địa chỉ đang dùng cho đơn này' : 'Lưu địa chỉ để dùng cho lần này và lần sau'}</Text></View>
+        {addressLoading && <Text style={s.small}>Đang tải địa chỉ đã lưu…</Text>}
+        {!!addressError && <View><Text accessibilityRole="alert" style={s.error}>{addressError}</Text><Action label="Thử tải lại" onPress={reloadAddress} /></View>}
+        {form.originalDeliverBy && <Text style={s.small}>Ngày nhận hiện tại: {new Date(form.originalDeliverBy).toLocaleDateString('vi-VN')}. Chọn bên dưới nếu muốn đổi ngày.</Text>}<Text style={s.label}>Ngày nhận</Text><View style={s.row}><Choice label="Hôm nay" selected={!form.originalDeliverBy && form.day === 'today'} onPress={() => patch({ day: 'today', originalDeliverBy: null })} /><Choice label="Ngày mai" selected={!form.originalDeliverBy && form.day === 'tomorrow'} onPress={() => patch({ day: 'tomorrow', originalDeliverBy: null })} /></View>
         <View style={s.row}><View style={s.flex}><Field label="Giao trước (HH:mm)" value={form.time} onChangeText={time => patch({ time })} placeholder="18:00" maxLength={5} keyboardType="numbers-and-punctuation" /></View><Image source={require('../../../assets/images/request-clock.png')} style={s.clock} /></View>
         <Field label="Tiền hàng dự kiến · Không bắt buộc" value={moneyInput(form.budget)} onChangeText={v => patch({ budget: v.replace(/\D/g, '').slice(0, 10) })} placeholder="Ví dụ: 150.000" keyboardType="number-pad" />
         <Text style={s.small}>Đơn vị: đồng. Ước tính cho cả giỏ, chưa gồm phí đi chợ. Tiền thực tế có thể thay đổi.</Text>
@@ -94,22 +128,22 @@ export function CreateRequestScreen({ step }: { step: 1 | 2 | 3 | 4 }) {
         <Field label="Lưu ý giao hàng · Không bắt buộc" value={form.deliveryNote} onChangeText={deliveryNote => patch({ deliveryNote })} multiline placeholder="Ví dụ: Gọi mình khi đến sảnh." maxLength={500} />
       </>}
       {step === 3 && <>
-        <View style={s.sectionRow}><Text style={s.bold}>Món cần mua</Text><Action label="Sửa" onPress={() => router.dismissTo('/create/items')} /></View>
+        <View style={s.sectionRow}><Text style={s.bold}>Món cần mua</Text><Action disabled={requestLocked} label="Sửa" onPress={() => router.dismissTo(route('items'))} /></View>
         <View style={s.card}>{form.items.map(i => <View key={i.id} style={s.reviewItem}><Text style={s.bold}>{i.name} · {i.quantity} {i.unit}</Text>{!!i.note && <Text style={s.description}>{i.note}</Text>}<Text style={s.small}>{i.allowSubstitution ? 'Có thể mua loại tương tự' : 'Không tự thay loại khác'}</Text></View>)}</View>
-        <View style={s.sectionRow}><Text style={s.bold}>Thông tin giao hàng</Text><Action label="Sửa" onPress={() => router.dismissTo('/create/delivery')} /></View>
-        <View style={s.card}><Text style={s.bold}>{form.recipient} · {form.phone}</Text><Text style={s.description}>{form.address}</Text><Text style={s.description}>{form.day === 'today' ? 'Hôm nay' : 'Ngày mai'} · Giao trước {form.time}</Text><Text style={s.description}>Thanh toán: {form.payment === 'cash' ? 'Tiền mặt' : 'Chuyển khoản'}</Text>{!!form.deliveryNote && <Text style={s.description}>{form.deliveryNote}</Text>}</View>
+        <View style={s.sectionRow}><Text style={s.bold}>Thông tin giao hàng</Text><Action disabled={requestLocked} label="Sửa" onPress={() => router.dismissTo(route('delivery'))} /></View>
+        <View style={s.card}><Text style={s.bold}>{form.phone}</Text><Text style={s.description}>{formatDeliveryAddress(form)}</Text><Text style={s.description}>{form.originalDeliverBy ? new Date(form.originalDeliverBy).toLocaleDateString('vi-VN') : form.day === 'today' ? 'Hôm nay' : 'Ngày mai'} · Giao trước {form.time}</Text><Text style={s.description}>Thanh toán: {form.payment === 'cash' ? 'Tiền mặt' : 'Chuyển khoản'}</Text>{!!form.deliveryNote && <Text style={s.description}>{form.deliveryNote}</Text>}</View>
         <View style={s.soft}><View style={s.sectionRow}><Text style={s.body}>Tiền hàng dự kiến</Text><Text style={s.bold}>{form.budget ? money(form.budget) : 'Chưa ước tính'}</Text></View><View style={s.sectionRow}><Text style={s.body}>Phí đi chợ</Text><Text style={s.bold}>{money(form.fee)}</Text></View><View style={[s.sectionRow, s.total]}><Text style={s.body}>Tổng dự kiến</Text><Text style={s.totalText}>{form.budget ? money(Number(form.budget) + Number(form.fee)) : 'Chưa xác định'}</Text></View><Text style={s.small}>{form.budget ? 'Tiền hàng thực tế có thể khác số tiền dự kiến.' : 'Bạn sẽ trả tiền hàng thực tế và phí đi chợ ở trên.'}</Text></View>
-        <Text style={s.small}>Bản xem thử, chưa đăng yêu cầu lên hệ thống.</Text>
+        <Text style={s.small}>{editId ? 'Thay đổi chỉ được lưu khi đơn chưa có người nhận.' : 'Yêu cầu sẽ được đăng để người đi chợ có thể nhận.'}</Text>
       </>}
-      {step === 4 && <View style={s.soft}><Text style={[s.body, s.center]}>Đây là trạng thái mô phỏng.{ '\n' }Chưa có yêu cầu nào được tạo thật.</Text></View>}
+      {step === 4 && <View style={s.soft}><Text style={[s.body, s.center]}>Yêu cầu đã được lưu và đăng thành công. Bạn có thể theo dõi trong Đơn hàng.</Text></View>}
       {!!error && <Text accessibilityRole="alert" style={s.error}>{error}</Text>}
     </ScrollView>
-    <View style={s.footer}><Pressable accessibilityRole="button" onPress={proceed} style={s.primary}><Text style={s.primaryText}>{step === 4 ? 'Thử tạo yêu cầu khác' : step === 3 ? 'Đăng yêu cầu' : 'Tiếp tục →'}</Text></Pressable><Text style={[s.small, s.footerHint]}>{step === 1 ? 'Tiếp theo: địa chỉ, thời gian và chi phí' : step === 2 ? 'Tiếp theo: kiểm tra trước khi đăng' : 'Bản xem thử · Chưa tạo yêu cầu thật'}</Text></View>
+    <View style={s.footer}>{step === 4 && <Action label="Xem đơn hàng" onPress={() => router.replace('/(tabs)/orders')} />}<Pressable accessibilityRole="button" onPress={proceed} disabled={publishing} accessibilityState={{ disabled: publishing, busy: publishing }} style={[s.primary, publishing && { opacity: 0.6 }]}><Text style={s.primaryText}>{step === 4 ? 'Tạo yêu cầu khác' : publishing ? editId ? 'Đang lưu…' : 'Đang đăng…' : step === 3 ? requestLocked ? 'Thử lại' : editId ? 'Lưu thay đổi' : 'Đăng yêu cầu' : 'Tiếp tục →'}</Text></Pressable><Text style={[s.small, s.footerHint]}>{step === 1 ? 'Tiếp theo: địa chỉ, thời gian và chi phí' : step === 2 ? 'Tiếp theo: kiểm tra thông tin' : step === 4 ? 'Đã đăng thành công' : 'Kiểm tra thông tin trước khi lưu'}</Text></View>
   </KeyboardAvoidingView>
-  <Modal visible={!!item || addressOpen} transparent animationType="slide" onRequestClose={() => { setItem(null); setAddressOpen(false); }}><View style={s.overlay}><SafeAreaView style={s.modalSafe}><KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={s.modal}>
-    <View style={s.sectionRow}><Text style={s.bold}>{item ? 'Thông tin món' : 'Địa chỉ nhận'}</Text><Action label="Đóng" onPress={() => { setItem(null); setAddressOpen(false); }} /></View>
-    {item ? <><Field label="Tên món" value={item.name} onChangeText={name => setItem({ ...item, name })} maxLength={160} placeholder="Ví dụ: Thịt heo nạc vai" /><Field label="Số lượng" value={item.quantity} onChangeText={quantity => setItem({ ...item, quantity })} keyboardType="decimal-pad" /><Text style={s.label}>Đơn vị</Text><View style={s.wrap}>{units.map(unit => <Choice key={unit} label={unit} selected={!customUnit && item.unit === unit} onPress={() => { setCustomUnit(false); setItem({ ...item, unit }); }} />)}<Choice label="Khác" selected={customUnit} onPress={() => { setCustomUnit(true); if (!customUnit) setItem({ ...item, unit: '' }); }} /></View>{customUnit && <Field label="Đơn vị tự nhập" value={item.unit} onChangeText={unit => setItem({ ...item, unit })} placeholder="Ví dụ: nải, lon, mớ…" maxLength={40} />}<Field label="Dặn người mua · Không bắt buộc" value={item.note} onChangeText={note => setItem({ ...item, note })} multiline maxLength={500} /><View style={s.row}><Switch accessibilityLabel="Cho phép mua loại tương tự" value={item.allowSubstitution} onValueChange={allowSubstitution => setItem({ ...item, allowSubstitution })} /><Text style={[s.body, s.flex]}>Cho phép mua loại tương tự nếu hết hàng</Text></View></> : <><Field label="Người nhận" value={address.recipient} onChangeText={recipient => setAddress({ ...address, recipient })} /><Field label="Số điện thoại" value={address.phone} onChangeText={phone => setAddress({ ...address, phone })} keyboardType="phone-pad" /><Field label="Địa chỉ đầy đủ" value={address.address} onChangeText={value => setAddress({ ...address, address: value })} multiline /></>}
-    {!!modalError && <Text accessibilityRole="alert" style={s.error}>{modalError}</Text>}<Pressable accessibilityRole="button" style={s.primary} onPress={() => { if (item) saveItem(); else { if (!address.recipient.trim() || !address.address.trim() || address.phone.replace(/\D/g, '').length < 9) { setModalError('Nhập đầy đủ người nhận, số điện thoại và địa chỉ.'); return; } patch(address); setAddressOpen(false); } }}><Text style={s.primaryText}>{item ? 'Xong' : 'Dùng địa chỉ này'}</Text></Pressable>
+  <Modal visible={!!item || addressOpen} transparent animationType="slide" onRequestClose={closeEditor}><View style={s.overlay}><SafeAreaView style={s.modalSafe}><KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={s.modal}>
+    <View style={s.sectionRow}><Text style={s.bold}>{item ? 'Thông tin món' : 'Địa chỉ nhận'}</Text><Action label="Đóng" onPress={closeEditor} /></View>
+    {item ? <><Field label="Tên món" value={item.name} onChangeText={name => setItem({ ...item, name })} maxLength={160} placeholder="Ví dụ: Thịt heo nạc vai" /><Field label="Số lượng" value={item.quantity} onChangeText={quantity => setItem({ ...item, quantity })} keyboardType="decimal-pad" /><Text style={s.label}>Đơn vị</Text><View style={s.wrap}>{units.map(unit => <Choice key={unit} label={unit} selected={!customUnit && item.unit === unit} onPress={() => { setCustomUnit(false); setItem({ ...item, unit }); }} />)}<Choice label="Khác" selected={customUnit} onPress={() => { setCustomUnit(true); if (!customUnit) setItem({ ...item, unit: '' }); }} /></View>{customUnit && <Field label="Đơn vị tự nhập" value={item.unit} onChangeText={unit => setItem({ ...item, unit })} placeholder="Ví dụ: nải, lon, mớ…" maxLength={30} />}<Field label="Dặn người mua · Không bắt buộc" value={item.note} onChangeText={note => setItem({ ...item, note })} multiline maxLength={500} /><View style={s.row}><Switch accessibilityLabel="Cho phép mua loại tương tự" value={item.allowSubstitution} onValueChange={allowSubstitution => setItem({ ...item, allowSubstitution })} /><Text style={[s.body, s.flex]}>Cho phép mua loại tương tự nếu hết hàng</Text></View></> : addressOpen ? <View pointerEvents={savingAddress ? "none" : "auto"}><DeliveryAddressFields value={address} onChange={value => setAddress({ ...value, savedAddress: null })} /></View> : null}
+    {!!modalError && <Text accessibilityRole="alert" style={s.error}>{modalError}</Text>}<Pressable accessibilityRole="button" accessibilityState={{ disabled: savingAddress, busy: savingAddress }} disabled={savingAddress} style={[s.primary, savingAddress && { opacity: 0.6 }]} onPress={saveEditor}><Text style={s.primaryText}>{item ? 'Xong' : savingAddress ? 'Đang lưu…' : 'Lưu và dùng địa chỉ'}</Text></Pressable>
   </ScrollView></KeyboardAvoidingView></SafeAreaView></View></Modal>
   </SafeAreaView>;
 }

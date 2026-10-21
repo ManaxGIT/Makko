@@ -75,12 +75,15 @@ class MarketplaceService:
                 continue
 
             distance = None
-            if latitude is not None and longitude is not None:
+            if (latitude is not None and longitude is not None
+                    and request.get("delivery_latitude") is not None
+                    and request.get("delivery_longitude") is not None):
                 distance = haversine_meters(
                     latitude, longitude,
                     float(request["delivery_latitude"]), float(request["delivery_longitude"]),
                 )
-                if radius_meters is not None and distance > radius_meters:
+            if latitude is not None and longitude is not None and radius_meters is not None:
+                if distance is None or distance > radius_meters:
                     continue
 
             results.append(ExploreRequest(
@@ -161,7 +164,9 @@ class MarketplaceService:
 
         items = (await self._items([request["id"]])).get(request["id"], [])
         distance = None
-        if latitude is not None and longitude is not None:
+        if (latitude is not None and longitude is not None
+                and request.get("delivery_latitude") is not None
+                and request.get("delivery_longitude") is not None):
             distance = haversine_meters(
                 latitude,
                 longitude,
@@ -349,7 +354,9 @@ class MarketplaceService:
 
         items = (await self._items([request["id"]])).get(request["id"], [])
         distance = None
-        if latitude is not None and longitude is not None:
+        if (latitude is not None and longitude is not None
+                and request.get("delivery_latitude") is not None
+                and request.get("delivery_longitude") is not None):
             distance = haversine_meters(
                 latitude,
                 longitude,

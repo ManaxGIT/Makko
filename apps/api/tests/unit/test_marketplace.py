@@ -184,3 +184,24 @@ async def test_release_accepted_request_uses_transaction_rpc():
     assert repository.function == "release_accepted_request"
     assert repository.payload == {"target_request_id": REQUEST_ID}
     assert result.status == "open"
+
+
+class NoCoordinatesRepository(FakeRepository):
+    async def select(self, table, *, params):
+        rows = await super().select(table, params=params)
+        if table == 'shopping_requests':
+            for row in rows:
+                row['delivery_latitude'] = None
+                row['delivery_longitude'] = None
+        return rows
+
+
+@pytest.mark.asyncio
+async def test_explore_without_order_coordinates():
+    service = MarketplaceService(NoCoordinatesRepository())
+    rows = await service.list_explore_requests(USER_ID, query=None, latitude=10.78, longitude=106.70, limit=10, radius_meters=None)
+    assert len(rows) == 1 and rows[0].distance_meters is None
+    nearby = await service.list_explore_requests(USER_ID, query=None, latitude=10.78, longitude=106.70, limit=10, radius_meters=3000)
+    assert nearby == []
+    detail = await service.get_explore_request(UUID(REQUEST_ID), USER_ID, latitude=10.78, longitude=106.70)
+    assert detail.distance_meters is None

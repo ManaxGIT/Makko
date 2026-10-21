@@ -11,8 +11,8 @@ export type HomeDashboard = {
     ward: string | null;
     district: string | null;
     city: string;
-    latitude: number;
-    longitude: number;
+    latitude: number | null;
+    longitude: number | null;
   } | null;
   nearbyRequests: ExploreRequest[];
 };

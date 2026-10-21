@@ -113,6 +113,17 @@ and the corresponding Supabase provider/configuration have been verified.
   database trigger/profile behavior, and a real device or simulator flow before
   describing authentication as working end-to-end.
 
+## Saved delivery addresses
+
+- Saved account addresses may omit coordinates (user decision, 2026-10-21).
+  Latitude and longitude must either both be present or both be null. Do not
+  substitute zeroes or administrative centroids for missing coordinates.
+- Saving a default address is independent of publishing or saving a draft order.
+  Restore it from the authenticated account on later visits.
+- Request publication also permits missing coordinates (user decision, 2026-10-21).
+  Coordinate-dependent features are deferred; do not block posting on geolocation
+  or fabricate distances. Preserve atomic creation/publication and owner checks.
+
 ## Figma implementation
 
 - Use a design-first workflow for new UI requests. When the user asks to
