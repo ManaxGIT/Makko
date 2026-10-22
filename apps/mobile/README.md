@@ -47,3 +47,12 @@ All primary screens live under `app/(tabs)/`. The group layout configures the
 tab navigator once, and `src/components/navigation/AppTabBar.tsx` owns the
 shared bottom navigation UI. Add a route to the group and register it in the
 layout; do not create a separate bottom bar inside individual screens.
+
+## Purchase evidence
+
+`requests/[id]/evidence` uses `expo-image-picker` for camera and gallery access.
+Rebuild the development client after installing this native dependency (for
+example `npx expo run:ios`); restarting Metro alone does not add native modules.
+Photos upload to the private `purchase-evidence` bucket with the signed-in
+session. Metadata and final submission go through FastAPI. Camera permissions
+and real photo uploads still need physical-device verification.

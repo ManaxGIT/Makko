@@ -160,3 +160,18 @@ and the corresponding Supabase provider/configuration have been verified.
   export or the relevant platform build when practical. Report separately what
   was statically verified and what was actually exercised on a device, simulator,
   browser, or configured Supabase project.
+
+## Purchase agreement and evidence
+
+- User decision (2026-10-22): orders use a fixed goods amount plus a separate
+  errand fee. When buying the full, correct order, the shopper keeps savings and
+  bears overruns; do not recalculate customer payment from actual purchase cost.
+- Existing orders were explicitly included in this conversion. The legacy
+  `estimated_items_total` field now holds the agreed amount for compatibility;
+  `actual_items_total` remains separate. Do not fabricate actual costs.
+- Missing or substituted goods require customer agreement and a corresponding
+  price adjustment. The adjustment workflow is not implemented; do not silently
+  deduct or let a missing-item flow proceed as a fully purchased order.
+- Purchase evidence uses private Storage, goods photos and optional receipt
+  photos classified separately. Final item confirmation, evidence registration,
+  and the shopping-to-delivering transition run in one PostgreSQL transaction.

@@ -26,7 +26,8 @@ class CreateRequestBody(ApiModel):
     title: str | None = None
     items: list[CreateRequestItem] = Field(min_length=1, max_length=100)
     deliver_by: AwareDatetime
-    estimated_items_total: Money | None = None
+    # Legacy API name: this is now the fixed agreed goods amount, not the actual cost.
+    estimated_items_total: Money = Field(gt=0)
     delivery_fee: Money
     payment_method: Literal['cash', 'bank_transfer']
     delivery_note: str | None = Field(default=None, max_length=500)

@@ -14,6 +14,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { EvidenceGallery } from '@/features/orders/EvidenceGallery';
 import { colors } from '@/theme/colors';
 import { fontFamilies, fontSizes } from '@/theme/typography';
 import { ExploreRequest, ExploreRequestItem, getExploreRequest } from '@/features/explore/api';
@@ -319,11 +320,19 @@ export default function RequestDetailsScreen() {
             </Text>
           </Pressable> : null}
         </View>
+        <View style={{ padding: 20, gap: 10, backgroundColor: colors.cream }}>
+          <Text style={styles.rewardLabel}>Tiền mua hàng đã thỏa thuận</Text>
+          <Text style={styles.reward}>{request.estimatedItemsTotal === null ? 'Chưa chốt' : formatMoney(request.estimatedItemsTotal, request.currency)}</Text>
+          <Text style={styles.rewardLabel}>Phí đi chợ: {formatMoney(request.deliveryFee, request.currency)}</Text>
+          <Text style={styles.rewardLabel}>Tổng thanh toán: {request.estimatedItemsTotal === null ? 'Chưa chốt' : formatMoney(request.estimatedItemsTotal + request.deliveryFee, request.currency)}</Text>
+          <Text style={styles.rewardLabel}>Mua đủ, đúng yêu cầu: người nhận giữ phần tiết kiệm và chịu phần vượt giá. Thiếu hoặc thay món cần hai bên đồng ý và điều chỉnh tiền.</Text>
+        </View>
+        {!!participantStatus && <EvidenceGallery requestId={id} />}
       </ScrollView>}
 
       {!loading && request && !participantStatus ? <View style={styles.footer}>
         <View>
-          <Text style={styles.rewardLabel}>Bạn nhận được</Text>
+          <Text style={styles.rewardLabel}>Phí đi chợ</Text>
           <Text style={styles.reward}>{formatMoney(request.deliveryFee, request.currency)}</Text>
         </View>
         <Pressable

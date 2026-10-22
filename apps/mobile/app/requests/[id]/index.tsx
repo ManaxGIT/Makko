@@ -56,7 +56,7 @@ const milestones: OrderStatus[] = ['accepted', 'shopping', 'delivering', 'comple
 
 const milestoneDescriptions: Partial<Record<OrderStatus, string>> = {
   accepted: 'Bạn đã nhận đơn và sẵn sàng đi chợ',
-  shopping: 'Kiểm tra đủ món và cập nhật giá',
+  shopping: 'Kiểm tra đủ món và thêm minh chứng',
   delivering: 'Di chuyển đến địa chỉ giao hàng',
   completed: 'Xác nhận hoàn tất đơn hàng',
 };
@@ -69,7 +69,7 @@ const nextMilestone: Partial<Record<OrderStatus, OrderStatus>> = {
 
 const nextActionLabels: Partial<Record<OrderStatus, string>> = {
   accepted: 'Bắt đầu chọn hàng',
-  shopping: 'Bắt đầu giao hàng',
+  shopping: 'Hoàn tất mua hàng',
   delivering: 'Xác nhận đã giao',
 };
 
@@ -293,6 +293,7 @@ export default function OrderTrackingScreen() {
 
   const handleAdvance = async () => {
     if (!id || !order || advancing) return;
+    if (order.status === 'shopping' && order.role === 'shopper') { router.push(`/requests/${id}/evidence`); return; }
     const targetStatus = nextMilestone[order.status];
     if (!targetStatus) return;
     setAdvancing(true);
@@ -425,7 +426,7 @@ export default function OrderTrackingScreen() {
               <View style={styles.tipCopy}>
                 <Text style={styles.tipTitle}>Đang ở bước chọn hàng</Text>
                 <Text style={styles.tipDescription}>
-                  Nhập giá từng món và chụp hoá đơn trước khi bắt đầu giao.
+                  Kiểm tra đủ món và thêm ảnh hàng đã mua. Hóa đơn không bắt buộc.
                 </Text>
               </View>
             </View>
@@ -695,7 +696,7 @@ const styles = StyleSheet.create({
   releaseButtonLabel: { color: colors.coral, fontFamily: fontFamilies.bodyBold, fontSize: fontSizes.bodySmall },
   advanceButton: {
     alignItems: 'center',
-    backgroundColor: colors.forest,
+    backgroundColor: colors.orange,
     borderRadius: 12,
     flex: 1.35,
     justifyContent: 'center',
@@ -703,7 +704,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   advanceButtonLabel: {
-    color: colors.surface,
+    color: colors.forest,
     fontFamily: fontFamilies.bodyBold,
     fontSize: fontSizes.bodySmall,
     textAlign: 'center',

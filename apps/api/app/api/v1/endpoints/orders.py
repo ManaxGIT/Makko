@@ -14,6 +14,9 @@ from app.schemas.create_request import CreateRequestBody
 from app.schemas.edit_request import EditableRequest, EditRequestBody
 from app.services.edit_request import EditRequestService
 
+from app.schemas.purchase_evidence import EvidencePhoto, SubmitEvidenceBody
+from app.services.purchase_evidence import PurchaseEvidenceService
+
 router = APIRouter(prefix="/orders", tags=["orders"])
 
 
@@ -115,3 +118,24 @@ async def transition_order(
     return await MarketplaceService(repository).transition_request(
         request_id, body.status, user.access_token
     )
+
+
+
+
+@router.get('/{request_id}/evidence', response_model=list[EvidencePhoto], response_model_by_alias=True)
+async def get_purchase_evidence(
+    request_id: UUID,
+    user: Annotated[CurrentUser, Depends(get_current_user)],
+    repository: Annotated[SupabaseRepository, Depends(get_repository)],
+) -> list[EvidencePhoto]:
+    return await PurchaseEvidenceService(repository).list(request_id, user.id)
+
+
+@router.post('/{request_id}/evidence', response_model=OrderActionResult, response_model_by_alias=True)
+async def submit_purchase_evidence(
+    request_id: UUID,
+    body: SubmitEvidenceBody,
+    user: Annotated[CurrentUser, Depends(get_current_user)],
+    repository: Annotated[SupabaseRepository, Depends(get_repository)],
+) -> OrderActionResult:
+    return await PurchaseEvidenceService(repository).submit(request_id, body, user.access_token)

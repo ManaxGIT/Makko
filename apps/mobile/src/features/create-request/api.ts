@@ -33,6 +33,7 @@ export function buildRequestBody(form: RequestForm, submissionKey: string, now =
   const [hour, minute] = form.time.split(':').map(Number);
   target.setHours(hour, minute, 0, 0);
   if (target.getTime() <= now.getTime()) throw new Error('Giờ giao đã qua. Chọn giờ muộn hơn hoặc ngày mai.');
+  if (!form.budget || Number(form.budget) <= 0) throw new Error('Nhập tiền mua hàng lớn hơn 0đ để chốt trước khi đăng.');
   if (!/^\d{1,10}$/.test(form.fee) || (form.budget && !/^\d{1,10}$/.test(form.budget))) throw new Error('Tiền hàng và phí đi chợ phải là số tiền hợp lệ.');
   return {
     submissionKey, title: title || null, addressId: form.savedAddress?.id ?? null, items, deliverBy: target.toISOString(),

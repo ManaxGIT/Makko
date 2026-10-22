@@ -195,3 +195,17 @@ The editor returns the stored title and allows changing it. Sending a null/blank
 edit title regenerates it from the submitted items; omitting the field preserves
 the current title for older clients. Existing rows are not renamed by migration.
 Run `supabase/tests/optional_request_title.sql` for rollback-only title checks.
+
+## Fixed-price purchase evidence
+
+- `GET /api/v1/orders/{request_id}/evidence`: participant-only photo metadata.
+- `POST /api/v1/orders/{request_id}/evidence`: `checkedItemIds` and `photos`
+  (`kind`: `goods` or `receipt`, `storagePath`). Validates the assigned shopper,
+  all item IDs, and private Storage objects in one RPC before starting delivery.
+- `estimatedItemsTotal` retains its legacy name but now means the positive,
+  agreed goods amount. Actual purchase cost is not overwritten or required.
+- Apply both purchase-evidence migrations before starting the updated API.
+  Existing missing budgets must be explicitly resolved before migration.
+- `supabase/tests/purchase_evidence.sql` verifies transactional and RLS behavior
+  using an existing shopping order and rolled-back synthetic Storage metadata.
+  It does not verify actual image uploads or camera access.

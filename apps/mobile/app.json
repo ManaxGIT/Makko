@@ -13,6 +13,14 @@
         {
           "experimentalLauncherActivity": false
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Cho phép Makko chọn ảnh hàng đã mua để gửi minh chứng.",
+          "cameraPermission": "Cho phép Makko chụp ảnh hàng đã mua.",
+          "microphonePermission": false
+        }
       ]
     ],
     "experiments": {

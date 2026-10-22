@@ -39,3 +39,15 @@ Mở `index.html` trực tiếp trong trình duyệt, hoặc chạy một static
 - Giấy gói: `#FBF8F0`
 - Body: Be Vietnam Pro
 - Display: Fraunces
+
+
+## Minh chứng mua hàng — bản đề xuất mới
+
+`purchase-proof.html` mô phỏng chốt tiền khi đăng yêu cầu và luồng người đi chợ:
+Theo dõi đơn → Kiểm tra hàng → Thêm ảnh → Xác nhận giao hàng.
+Tiền mua hàng đã thỏa thuận và phí đi chợ hiển thị riêng; không yêu cầu nhập giá
+thực mua. Người nhận giữ phần tiết kiệm và chịu phần vượt khi mua đủ, đúng yêu cầu.
+Trường hợp thiếu/thay món chặn tiếp tục; luồng hai bên xác nhận điều chỉnh chưa
+được mô phỏng. Phí 25.000đ giữ từ mẫu trước, không phải mức phí mới được chốt.
+Ảnh minh họa được ghi nhãn. Không tải lên server, đăng đơn hoặc thanh toán thật.
+Mở tại `http://127.0.0.1:4173/purchase-proof.html`.

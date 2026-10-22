@@ -17,7 +17,7 @@ BODY = {
     'submissionKey': 'test-submission-0001',
     'addressId': 'f1c79ef1-8f60-47bc-aeb8-0f461e4cabcc',
     'items': [{'name': 'Rau muống', 'quantity': '0.5', 'unit': 'bó', 'note': 'Rau non', 'allowSubstitution': True}],
-    'deliverBy': '2030-01-01T10:00:00+07:00', 'estimatedItemsTotal': None,
+    'deliverBy': '2030-01-01T10:00:00+07:00', 'estimatedItemsTotal': '100000',
     'deliveryFee': '25000', 'paymentMethod': 'cash', 'deliveryNote': 'Gọi khi đến',
 }
 
@@ -61,7 +61,7 @@ def test_post_uses_one_authenticated_transaction(api):
     assert request['submission_key'] == BODY['submissionKey']
     assert request['items'][0]['quantity'] == '0.5'
     assert request['items'][0]['allow_substitution'] is True
-    assert request['estimated_items_total'] is None
+    assert request['estimated_items_total'] == '100000'
     assert 'customer_id' not in request and 'latitude' not in request
 
 
@@ -115,4 +115,11 @@ def test_optional_title_is_normalized(api, title, expected):
 def test_invalid_title_is_rejected(api, title):
     client, repo, _ = api
     assert client.post('/api/v1/orders', json={**BODY, 'title': title}).status_code == 422
+    assert not repo.calls
+
+
+@pytest.mark.parametrize('amount', [None, '0', '-1'])
+def test_fixed_amount_is_required(api, amount):
+    client, repo, _ = api
+    assert client.post('/api/v1/orders', json={**BODY, 'estimatedItemsTotal': amount}).status_code == 422
     assert not repo.calls
