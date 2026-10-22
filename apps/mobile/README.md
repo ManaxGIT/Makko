@@ -56,3 +56,20 @@ example `npx expo run:ios`); restarting Metro alone does not add native modules.
 Photos upload to the private `purchase-evidence` bucket with the signed-in
 session. Metadata and final submission go through FastAPI. Camera permissions
 and real photo uploads still need physical-device verification.
+
+## Refresh behavior
+
+Order lists keep an in-memory cache per account and list scope (active/history).
+A list focused again within 30 seconds uses its cached data; older or invalidated
+lists refresh in the background. Only an initial load hides the list. Pull down
+on Orders/Order history to force a refresh. Successful cancellation updates the
+list locally, and other order mutations invalidate freshness. Signing out or
+changing accounts clears the cache. Cache entries are not persisted to disk.
+
+Order tracking and chat retain their live background refresh. Request details
+reuse loaded content for 30 seconds while the screen remains mounted. Explore
+keeps results during refresh/search and ignores obsolete search responses.
+
+Run `node --test tests/order-list-cache.test.cjs` from `apps/mobile` to check
+read deduplication, cancellation, invalidation, account isolation, stale-response
+handling and recovery from a failed refresh.

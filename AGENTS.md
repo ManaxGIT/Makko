@@ -175,3 +175,64 @@ and the corresponding Supabase provider/configuration have been verified.
 - Purchase evidence uses private Storage, goods photos and optional receipt
   photos classified separately. Final item confirmation, evidence registration,
   and the shopping-to-delivering transition run in one PostgreSQL transaction.
+
+## Delivery and receipt confirmation
+
+- User decision (2026-10-23): delivery completion requires two separate confirmations.
+  Only the assigned shopper may move `delivering -> delivered`; only the customer
+  may move `delivered -> completed`. Neither party may skip the other confirmation.
+- `delivered` means the shopper has confirmed handoff and the order is waiting for
+  the customer's receipt confirmation. It remains an active order; mark the
+  assignment complete only when the customer completes the order.
+- User decision (2026-10-23): shopper handoff confirmation requires at least one
+  private delivery photo, classified separately from goods/receipt photos. Register
+  delivery evidence and move `delivering -> delivered` in one PostgreSQL RPC;
+  do not allow a status-only call to bypass the photo requirement.
+
+## Order chat
+
+- User decisions (2026-10-23): chat opens as soon as a shopper accepts a request,
+  including before shopping starts. Completed or cancelled orders are read-only.
+- Releasing an accepted assignment deletes the old conversation history; a later
+  shopper starts a fresh conversation. Do not expose old messages to a new shopper.
+- Chat reads/writes go through FastAPI. Realtime only signals that the client should
+  reload through the API. Sending must atomically verify the current assignment and
+  order status, serialized with release and status transitions.
+
+## Order lists and deletion
+
+- User decision (2026-10-23): the Orders tab separates active orders by role:
+  posted requests (`customer`) and accepted requests (`shopper`). Completed and
+  cancelled orders are accessed through Account → Order history.
+- Deleting a posted request uses the existing cancellation transition, retains
+  its history, and is allowed only for the owner before acceptance (draft/open).
+  Preserve database serialization with acceptance: a cancelled request cannot be
+  accepted, and an accepted request cannot be removed through this action.
+
+## Data loading and refresh experience
+
+- User decision (2026-10-23): preserve already-loaded content when returning to
+  a screen or refreshing data. Full-screen loading is for the initial load when
+  no usable result exists; a successfully loaded empty list is usable data.
+- Do not unconditionally refetch on every navigation focus. Reuse cached data
+  while fresh and refresh stale or invalidated data in the background without
+  clearing the screen, selection, or scroll position unnecessarily. Order lists
+  currently use a 30-second freshness interval; choose other intervals according
+  to the feature's actual needs rather than applying this value universally.
+- After a confirmed mutation, update affected local/cached data when its effect
+  is known instead of reloading the entire list. Successful order deletion removes
+  the item locally. Invalidate related data when authoritative details are still
+  needed; do not fabricate missing server values or bypass server validation.
+- Provide pull-to-refresh for lists that need manual refresh. Keep usable content
+  visible on background errors and offer a retry without replacing it with an
+  error screen. Distinguish initial loading, background fetching, and manual refresh.
+- Deduplicate concurrent reads of the same query. Reject obsolete responses so
+  they cannot overwrite newer searches or mutations, or resurrect removed items.
+  Scope caches by account and query parameters; clear them on logout/account change
+  and prevent in-flight responses from restoring data after clearing.
+- Preserve necessary live updates for chat and order tracking in the background,
+  with subscription/timer cleanup. Reducing requests must not hide status changes
+  or weaken ownership, cancellation, and acceptance checks on the server.
+- Reuse the existing cache implementation and auth owner before adding another
+  mechanism or dependency. When available, use the `preserve-data-on-refresh`
+  skill for implementation guidance; this file remains the project's authority.

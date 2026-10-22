@@ -209,3 +209,48 @@ Run `supabase/tests/optional_request_title.sql` for rollback-only title checks.
 - `supabase/tests/purchase_evidence.sql` verifies transactional and RLS behavior
   using an existing shopping order and rolled-back synthetic Storage metadata.
   It does not verify actual image uploads or camera access.
+
+## Order chat
+
+- `GET /api/v1/orders/{request_id}/chat`: current participant-only conversation
+  context and up to 50 messages, newest first. Optional `limit` is 1–100. Use
+  `before=<message-id>` for older messages or `after=<message-id>` to catch up
+  (mutually exclusive). `hasMore` refers to the selected direction; an `after`
+  query reads the oldest unseen batch first and returns that batch newest first.
+  Message bigint IDs are JSON strings.
+- `POST /api/v1/orders/{request_id}/chat/messages`: `{ "body": "Xin chào",
+  "clientKey": "<uuid>", "assignmentId": "<uuid from GET>" }`. Returns the
+  persisted message. Text is trimmed and limited to 1–4000 characters. Reuse the
+  same key, body and assignment when retrying an uncertain response. The server
+  derives the sender from the validated token; supplied sender IDs are rejected.
+
+Apply `order_chat` before running the updated clients. The sending RPC locks the
+request using the same lock as release and status changes, validates the current
+assignment, and prevents duplicate retry writes. Chat opens immediately after
+acceptance. Completed/cancelled orders retain read-only history. Releasing an
+accepted assignment **deletes its chat history in the release transaction**; a
+new shopper starts fresh and stale composers cannot send into the new assignment.
+Mobile only uses Realtime inserts as invalidation signals, reloads content via
+FastAPI, and also polls every five seconds while the screen is focused/foreground
+to recover missed events and update order status. No push notifications are added.
+
+`supabase/tests/order_chat.sql` checks RLS, RPC authorization, retry behavior,
+read-only states, history deletion, and reassignment with rolled-back synthetic
+requests. It needs three existing active profiles and leaves no test rows.
+Run `pytest` from `apps/api` for HTTP and service checks. Native keyboard behavior
+and two-device Realtime delivery still require a device test.
+
+## Order lists and removing an unaccepted request
+
+`GET /api/v1/orders` supports `scope=active` (exclude completed/cancelled),
+`scope=history` (only completed/cancelled), or `scope=all` (default, backward
+compatible). The filter is applied before the query limit. Mobile displays active
+orders by customer/shopper role; Account → Order history displays terminal orders.
+
+The owner's **Xóa đơn** action reuses `PATCH /api/v1/orders/{id}/status` with
+`{"status":"cancelled"}`. It retains the row for history. The existing transaction
+only permits cancellation of owned draft/open requests, locks the request, and
+prevents subsequent acceptance. If acceptance already won, cancellation returns
+409 and the client reloads the list. No hard-delete endpoint is introduced.
+`supabase/tests/cancel_unaccepted_order.sql` verifies ownership and both operation
+orders with rolled-back synthetic rows; it does not run a two-session stress test.
