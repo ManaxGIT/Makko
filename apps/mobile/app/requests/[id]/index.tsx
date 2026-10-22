@@ -1,5 +1,5 @@
-import type { ComponentProps } from 'react';
-import { useCallback, useMemo, useState } from 'react';
+import type { ComponentProps, ReactNode } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -14,10 +14,13 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { EvidenceGallery } from '@/features/orders/EvidenceGallery';
 import { colors } from '@/theme/colors';
 import { fontFamilies, fontSizes, letterSpacing, lineHeights } from '@/theme/typography';
 import {
   getOrderTracking,
+  getOrderDetail,
+  OrderDetail,
   OrderStatus,
   OrderTracking,
   releaseOrder,
@@ -32,6 +35,7 @@ type TimelineStep = {
   status: TimelineStatus;
   title: string;
   message?: string;
+  milestone?: OrderStatus;
 };
 
 const statusLabels: Record<OrderStatus, string> = {
@@ -40,6 +44,7 @@ const statusLabels: Record<OrderStatus, string> = {
   accepted: 'ĐÃ NHẬN ĐƠN',
   shopping: 'ĐANG ĐI CHỢ',
   delivering: 'ĐANG GIAO HÀNG',
+  delivered: 'CHỜ XÁC NHẬN NHẬN HÀNG',
   completed: 'ĐÃ HOÀN THÀNH',
   cancelled: 'ĐÃ HỦY',
   disputed: 'ĐANG XỬ LÝ SỰ CỐ',
@@ -49,29 +54,31 @@ const milestoneTitles: Partial<Record<OrderStatus, string>> = {
   accepted: 'Đã nhận yêu cầu',
   shopping: 'Đang chọn hàng',
   delivering: 'Đang giao đến bạn',
-  completed: 'Đã giao hàng',
+  delivered: 'Đã giao hàng',
+  completed: 'Đã nhận hàng · Hoàn thành',
 };
 
-const milestones: OrderStatus[] = ['accepted', 'shopping', 'delivering', 'completed'];
-
-const milestoneDescriptions: Partial<Record<OrderStatus, string>> = {
-  accepted: 'Bạn đã nhận đơn và sẵn sàng đi chợ',
-  shopping: 'Kiểm tra đủ món và thêm minh chứng',
-  delivering: 'Di chuyển đến địa chỉ giao hàng',
-  completed: 'Xác nhận hoàn tất đơn hàng',
-};
+const milestones: OrderStatus[] = ['accepted', 'shopping', 'delivering', 'delivered', 'completed'];
 
 const nextMilestone: Partial<Record<OrderStatus, OrderStatus>> = {
   accepted: 'shopping',
   shopping: 'delivering',
-  delivering: 'completed',
+  delivering: 'delivered',
+  delivered: 'completed',
 };
 
 const nextActionLabels: Partial<Record<OrderStatus, string>> = {
   accepted: 'Bắt đầu chọn hàng',
   shopping: 'Hoàn tất mua hàng',
-  delivering: 'Xác nhận đã giao',
+  delivering: 'Xác nhận đã giao hàng',
+  delivered: 'Xác nhận đã nhận hàng',
 };
+
+function canAdvanceOrder(order: OrderTracking) {
+  return order.role === 'shopper'
+    ? order.status === 'accepted' || order.status === 'shopping' || order.status === 'delivering'
+    : order.status === 'delivered';
+}
 
 const TRACKING_REFRESH_INTERVAL_MS = 5_000;
 
@@ -89,27 +96,36 @@ function initials(name: string) {
 
 function buildTimeline(order: OrderTracking): TimelineStep[] {
   const currentIndex = milestones.indexOf(order.status);
-  const eventTimes = new Map(order.statusHistory.map((event) => [event.toStatus, event.createdAt]));
-  if (!eventTimes.has('accepted') && order.assignmentAcceptedAt) {
-    eventTimes.set('accepted', order.assignmentAcceptedAt);
-  }
-
-  const steps = milestones.map((status, index): TimelineStep => {
-    const eventTime = formatTime(eventTimes.get(status) ?? null);
-    const pendingEta = status === 'delivering' ? formatTime(order.deliverBy) : null;
-    return {
-      title: milestoneTitles[status] ?? status,
-      description: milestoneDescriptions[status] ?? 'Đang chờ cập nhật',
-      message: eventTime ?? (pendingEta ? `Dự kiến ${pendingEta}` : undefined),
-      status: index < currentIndex ? 'complete' : index === currentIndex ? 'current' : 'pending',
-    };
-  });
-
-  if (order.status === 'cancelled' || order.status === 'disputed') {
-    const event = order.statusHistory.find((item) => item.toStatus === order.status);
-    steps.push({
+  const exceptional = order.status === 'cancelled' || order.status === 'disputed';
+  const eventTimes = new Map(order.statusHistory.map(event => [event.toStatus, event.createdAt]));
+  if (!eventTimes.has('accepted') && order.assignmentAcceptedAt) eventTimes.set('accepted', order.assignmentAcceptedAt);
+  const reachedIndex = exceptional
+    ? Math.max(-1, ...milestones.map((status, index) => eventTimes.has(status) ? index : -1))
+    : currentIndex;
+  const shopper = order.role === 'shopper';
+  const descriptions = [
+    shopper ? 'Bạn đã nhận đơn và sẵn sàng đi chợ' : 'Người đi chợ đã nhận yêu cầu',
+    shopper ? 'Kiểm tra đủ món, đúng yêu cầu' : 'Người đi chợ đang chọn và mua hàng',
+    shopper ? 'Bạn đang di chuyển đến nơi nhận' : 'Người đi chợ đang di chuyển đến nơi nhận',
+    shopper ? 'Bạn đã xác nhận giao hàng' : 'Người đi chợ đã xác nhận giao hàng',
+    shopper ? 'Người đăng đã xác nhận nhận hàng' : 'Bạn đã xác nhận nhận hàng',
+  ];
+  const pending = ['Chờ nhận yêu cầu', 'Chờ bắt đầu chọn hàng', 'Chờ bắt đầu giao hàng', 'Chờ xác nhận đã giao hàng', 'Chờ xác nhận đã nhận hàng'];
+  const steps = milestones.map((status, index): TimelineStep => ({
+    milestone: status,
+    title: status === 'delivering' && shopper ? 'Đang giao hàng' : milestoneTitles[status] ?? status,
+    description: index > reachedIndex ? pending[index]
+      : index === 1 && reachedIndex >= 2 ? 'Đã hoàn tất mua hàng'
+      : index === 2 && reachedIndex > 2 ? 'Đã bắt đầu giao hàng' : descriptions[index],
+    message: formatTime(eventTimes.get(status) ?? null) ?? undefined,
+    status: index < reachedIndex || (index <= reachedIndex && (exceptional || order.status === 'completed'))
+      ? 'complete' : index === currentIndex ? 'current' : 'pending',
+  }));
+  if (exceptional) {
+    steps.splice(reachedIndex + 1, 0, {
       title: order.status === 'cancelled' ? 'Đơn đã hủy' : 'Đang xử lý sự cố',
-      description: formatTime(event?.createdAt ?? null) ?? 'Vừa cập nhật',
+      description: order.status === 'cancelled' ? 'Hành trình dừng tại đây.' : 'Chưa có thông tin chi tiết về sự cố.',
+      message: formatTime(eventTimes.get(order.status) ?? null) ?? undefined,
       status: 'current',
     });
   }
@@ -117,19 +133,23 @@ function buildTimeline(order: OrderTracking): TimelineStep[] {
 }
 
 function trackingHeading(order: OrderTracking) {
-  const name = order.counterpart?.displayName ?? 'Người đi chợ';
+  const name = order.counterpart?.displayName ?? (order.role === 'shopper' ? 'người đăng' : 'Người đi chợ');
+  if (order.status === 'cancelled') return 'Đơn hàng đã được hủy';
+  if (order.status === 'disputed') return 'Đơn hàng đang có sự cố';
+  if (order.status === 'open') return 'Đang tìm người đi chợ giúp bạn';
+  if (order.status === 'draft') return 'Yêu cầu chưa được đăng';
   if (order.role === 'shopper') {
     if (order.status === 'delivering') return `Bạn đang giao đơn cho ${name}`;
+    if (order.status === 'delivered') return 'Bạn đã giao hàng, chờ người nhận xác nhận';
     if (order.status === 'completed') return `Bạn đã hoàn thành đơn của ${name}`;
     return order.status === 'shopping'
       ? `Bạn đang chọn đồ cho ${name}`
-      : `Bạn đang mua giúp ${name}`;
+      : `Bạn đã nhận đơn của ${name}`;
   }
   if (order.status === 'accepted') return `${name} đã nhận yêu cầu của bạn`;
   if (order.status === 'delivering') return `${name} đang giao đến bạn`;
-  if (order.status === 'completed') return `${name} đã giao hàng`;
-  if (order.status === 'cancelled') return 'Đơn hàng đã được hủy';
-  if (order.status === 'disputed') return 'Đơn hàng đang được hỗ trợ';
+  if (order.status === 'delivered') return `${name} đã giao hàng, bạn hãy kiểm tra và xác nhận`;
+  if (order.status === 'completed') return 'Bạn đã xác nhận nhận hàng';
   return `${name} đang chọn đồ giúp bạn`;
 }
 
@@ -157,6 +177,8 @@ function RoundButton({ accessibilityLabel, icon, onPress }: {
     <Pressable
       accessibilityLabel={accessibilityLabel}
       accessibilityRole="button"
+      disabled={!onPress}
+      accessibilityState={{ disabled: !onPress }}
       onPress={onPress}
       style={({ pressed }) => [styles.roundButton, pressed && styles.pressed]}
     >
@@ -191,7 +213,9 @@ function TimelineItem({
   isLast,
   status,
   title,
+  children,
 }: {
+  children?: ReactNode;
   description: string;
   message?: string;
   isLast: boolean;
@@ -205,9 +229,9 @@ function TimelineItem({
         {!isLast && <View style={styles.timelineLine} />}
       </View>
       <View style={styles.timelineCopy}>
-        <Text style={styles.timelineTitle}>{title}</Text>
+        <View style={styles.timelineTitleRow}><Text style={styles.timelineTitle}>{title}</Text>{message ? <Text style={styles.timelineMeta}>{message}</Text> : null}</View>
         <Text style={styles.timelineDescription}>{description}</Text>
-        {message ? <Text style={styles.timelineMeta}>{message}</Text> : null}
+        {children}
       </View>
     </View>
   );
@@ -217,14 +241,18 @@ export default function OrderTrackingScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [order, setOrder] = useState<OrderTracking | null>(null);
+  const [detail, setDetail] = useState<OrderDetail | null>(null);
+  const [detailError, setDetailError] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [releasing, setReleasing] = useState(false);
   const [advancing, setAdvancing] = useState(false);
 
+  const trackingLoaded = useRef<string | null>(null);
+  const detailLoaded = useRef<{ id: string; at: number } | null>(null);
   const loadTracking = useCallback(async (options?: { silent?: boolean }) => {
-    const silent = options?.silent ?? false;
+    const silent = options?.silent ?? (trackingLoaded.current === id);
     if (!id) {
       setError('Không tìm thấy mã đơn hàng.');
       setLoading(false);
@@ -235,7 +263,9 @@ export default function OrderTrackingScreen() {
       setError(null);
     }
     try {
-      setOrder(await getOrderTracking(id));
+      const tracking = await getOrderTracking(id);
+      trackingLoaded.current = id;
+      setOrder(tracking);
       setError(null);
     } catch (loadError) {
       if (!silent) {
@@ -253,22 +283,39 @@ export default function OrderTrackingScreen() {
     }, TRACKING_REFRESH_INTERVAL_MS);
     return () => clearInterval(refreshInterval);
   }, [loadTracking]));
+  useFocusEffect(useCallback(() => {
+    let active = true;
+    if (detailLoaded.current?.id === id && Date.now() - detailLoaded.current.at < 30_000) return;
+    if (detailLoaded.current?.id !== id) setDetail(null);
+    setDetailError(false);
+    if (id) void getOrderDetail(id).then(result => { if (active) { detailLoaded.current = { id, at: Date.now() }; setDetail(result); } })
+      .catch(() => { if (active) setDetailError(true); });
+    return () => { active = false; };
+  }, [id]));
   const timelineSteps = useMemo(() => order ? buildTimeline(order) : [], [order]);
   const counterpartName = order?.counterpart?.displayName ?? 'Chưa có thông tin';
   const eta = formatTime(order?.deliverBy ?? null);
+  const lastStatusTime = order ? formatTime(order.statusHistory.filter(event => event.toStatus === order.status).at(-1)?.createdAt ?? null) : null;
+  const showEvidence = !!order && (order.status === 'delivering' || order.status === 'delivered' || order.status === 'completed'
+    || ((order.status === 'cancelled' || order.status === 'disputed') && order.statusHistory.some(event => ['delivering', 'delivered', 'completed'].includes(event.toStatus))));
+  const money = (value: number | null, currency = detail?.currency ?? 'VND') => value === null ? 'Chưa có thông tin' : new Intl.NumberFormat('vi-VN', { style: 'currency', currency, maximumFractionDigits: 0 }).format(value);
   const currentMilestoneIndex = order ? milestones.indexOf(order.status) : -1;
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     await loadTracking({ silent: true });
+    if (id) {
+      try { setDetail(await getOrderDetail(id)); setDetailError(false); }
+      catch { setDetailError(true); }
+    }
     setRefreshing(false);
-  }, [loadTracking]);
+  }, [id, loadTracking]);
 
   const handleRelease = () => {
     if (!id || releasing) return;
     Alert.alert(
       'Hủy nhận đơn?',
-      'Đơn sẽ quay lại danh sách yêu cầu để người khác có thể nhận.',
+      'Đơn sẽ quay lại danh sách yêu cầu để người khác có thể nhận. Lịch sử chat của đơn sẽ bị xóa.',
       [
         { text: 'Không', style: 'cancel' },
         {
@@ -292,7 +339,8 @@ export default function OrderTrackingScreen() {
   };
 
   const handleAdvance = async () => {
-    if (!id || !order || advancing) return;
+    if (!id || !order || advancing || releasing || !canAdvanceOrder(order)) return;
+    if (order.status === 'delivering' && order.role === 'shopper') { router.push(`/requests/${id}/evidence?stage=delivery`); return; }
     if (order.status === 'shopping' && order.role === 'shopper') { router.push(`/requests/${id}/evidence`); return; }
     const targetStatus = nextMilestone[order.status];
     if (!targetStatus) return;
@@ -356,11 +404,11 @@ export default function OrderTrackingScreen() {
               <Text style={styles.statusLabel}>{statusLabels[order.status]}</Text>
             </View>
             {currentMilestoneIndex >= 0 ? (
-              <Text style={styles.stageLabel}>GIAI ĐOẠN {currentMilestoneIndex + 1}/4</Text>
+              <Text style={styles.stageLabel}>GIAI ĐOẠN {currentMilestoneIndex + 1}/{milestones.length}</Text>
             ) : null}
           </View>
           <Text style={styles.heading}>{trackingHeading(order)}</Text>
-          <Text style={styles.eta}>{eta ? `Dự kiến giao lúc ${eta}` : 'Thời gian giao đang được cập nhật'}</Text>
+          <Text style={styles.eta}>{order.status === 'delivered' ? (lastStatusTime ? `Đã giao lúc ${lastStatusTime}` : 'Chờ xác nhận nhận hàng') : order.status === 'completed' ? (lastStatusTime ? `Hoàn thành lúc ${lastStatusTime}` : 'Đơn đã hoàn thành') : order.status === 'cancelled' ? (lastStatusTime ? `Đã hủy lúc ${lastStatusTime}` : 'Đơn đã hủy') : order.status === 'disputed' ? (lastStatusTime ? `Sự cố ghi nhận lúc ${lastStatusTime}` : 'Đang xử lý sự cố') : eta ? `Giao trước ${eta}` : 'Thời gian giao linh hoạt'}</Text>
 
           <View style={styles.shopperCard}>
             <View style={styles.shopperAvatar}>
@@ -384,24 +432,35 @@ export default function OrderTrackingScreen() {
               />
               <RoundButton
                 accessibilityLabel={`Nhắn tin cho ${counterpartName}`}
+                onPress={() => router.push(`/requests/${id}/chat`)}
                 icon={{ ios: 'envelope.fill', android: 'mail', web: 'mail' }}
               />
             </View>
           </View>
         </View>
 
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryTitle}>{detail?.title ?? 'Thông tin đơn hàng'}</Text>
+          {detail ? <>
+            <View style={styles.summaryRow}><Text style={styles.summaryLabel}>{detail.itemCount} món · Tiền hàng</Text><Text style={styles.summaryValue}>{money(detail.estimatedItemsTotal)}</Text></View>
+            <View style={styles.summaryRow}><Text style={styles.summaryLabel}>Phí đi chợ</Text><Text style={styles.summaryValue}>{money(detail.deliveryFee)}</Text></View>
+            <View style={styles.summaryRow}><Text style={styles.summaryValue}>Tổng tiền đã chốt</Text><Text style={styles.summaryValue}>{money(detail.estimatedItemsTotal === null ? null : detail.estimatedItemsTotal + detail.deliveryFee)}</Text></View>
+            <Text style={styles.summaryNote}>Tổng tiền giữ nguyên khi mua đủ, đúng yêu cầu.</Text>
+            {order.status === 'delivering' && <Text style={styles.summaryNote}>Khu vực giao: {[detail.deliveryWard, detail.deliveryDistrict, detail.deliveryCity].filter(Boolean).join(', ') || 'Chưa có thông tin'}</Text>}
+          </> : <Text style={styles.summaryNote}>{detailError ? 'Chưa tải được thông tin đơn. Kéo xuống để thử lại.' : 'Đang tải thông tin đơn…'}</Text>}
+        </View>
         <View style={styles.journeySection}>
           <View style={styles.journeyHeadingRow}>
             <Text style={styles.sectionTitle}>Hành trình đơn hàng</Text>
             {currentMilestoneIndex >= 0 ? (
-              <Text style={styles.progressLabel}>{currentMilestoneIndex + 1} trên 4</Text>
+              <Text style={styles.progressLabel}>{currentMilestoneIndex + 1} trên {milestones.length}</Text>
             ) : null}
           </View>
           <View style={styles.progressBar}>
-            {milestones.map((status, index) => (
+            {milestones.map((status) => (
               <View
                 key={status}
-                style={[styles.progressSegment, index <= currentMilestoneIndex && styles.progressSegmentActive]}
+                style={[styles.progressSegment, timelineSteps.some(step => step.milestone === status && step.status !== 'pending') && styles.progressSegmentActive]}
               />
             ))}
           </View>
@@ -411,26 +470,14 @@ export default function OrderTrackingScreen() {
                 key={step.title}
                 {...step}
                 isLast={index === timelineSteps.length - 1}
-              />
+              >
+                {step.milestone === 'shopping' && showEvidence && <View style={styles.evidence}><EvidenceGallery requestId={order.id} category="purchase" /></View>}
+                {step.milestone === 'delivered' && showEvidence && (order.status === 'delivered' || order.status === 'completed' || order.statusHistory.some(event => event.toStatus === 'delivered')) && <View style={styles.evidence}><EvidenceGallery requestId={order.id} category="delivery" /></View>}
+                {step.milestone === 'shopping' && order.status === 'shopping' && <View style={styles.shoppingHint}><Text style={styles.summaryNote}>{order.role === 'shopper' ? 'Khi mua xong: kiểm tra từng món, thêm ít nhất 1 ảnh hàng và xác nhận trước khi giao. Hóa đơn không bắt buộc.' : 'Ảnh hàng đã mua sẽ xuất hiện tại đây khi người đi chợ hoàn tất mua hàng.'}</Text></View>}
+              </TimelineItem>
             ))}
           </View>
-          {order.status === 'shopping' ? (
-            <View style={styles.tipCard}>
-              <View style={styles.tipIcon}>
-                <AppIcon
-                  name={{ ios: 'basket.fill', android: 'shopping_basket', web: 'shopping_basket' }}
-                  color={colors.forest}
-                  size={18}
-                />
-              </View>
-              <View style={styles.tipCopy}>
-                <Text style={styles.tipTitle}>Đang ở bước chọn hàng</Text>
-                <Text style={styles.tipDescription}>
-                  Kiểm tra đủ món và thêm ảnh hàng đã mua. Hóa đơn không bắt buộc.
-                </Text>
-              </View>
-            </View>
-          ) : null}
+
         </View>
       </ScrollView>}
 
@@ -442,9 +489,9 @@ export default function OrderTrackingScreen() {
         >
           <Text style={styles.detailButtonLabel}>Xem chi tiết đơn</Text>
         </Pressable>
-        {order.role === 'shopper' && nextMilestone[order.status] ? (
+        {canAdvanceOrder(order) ? (
           <View style={styles.actionRow}>
-            {order.status === 'accepted' ? (
+            {order.role === 'shopper' && order.status === 'accepted' ? (
               <Pressable
                 accessibilityRole="button"
                 disabled={releasing || advancing}
@@ -466,12 +513,24 @@ export default function OrderTrackingScreen() {
             </Pressable>
           </View>
         ) : null}
+        {order.role === 'shopper' && order.status === 'delivered' ? (
+          <Text style={styles.waitingMessage}>Chờ người đăng xác nhận nhận hàng</Text>
+        ) : null}
       </View> : null}
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  waitingMessage: { color: colors.muted, fontFamily: fontFamilies.body, fontSize: fontSizes.bodySmall, lineHeight: lineHeights.bodySmall, textAlign: 'center', paddingVertical: 8 },
+  summaryCard: { marginHorizontal: 20, marginTop: 16, padding: 14, gap: 8, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 14 },
+  summaryTitle: { fontFamily: fontFamilies.bodyBold, fontSize: fontSizes.bodySmall, color: colors.forest, marginBottom: 2 },
+  summaryRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' },
+  summaryLabel: { fontFamily: fontFamilies.body, fontSize: fontSizes.caption, color: colors.text },
+  summaryValue: { fontFamily: fontFamilies.bodyBold, fontSize: fontSizes.caption, color: colors.text },
+  summaryNote: { fontFamily: fontFamilies.body, fontSize: fontSizes.caption, lineHeight: lineHeights.caption, color: colors.muted },
+  evidence: { marginTop: 8 },
+  shoppingHint: { backgroundColor: colors.cream, borderRadius: 12, padding: 12, marginTop: 8 },
   safeArea: { backgroundColor: colors.background, flex: 1 },
   stateContainer: { alignItems: 'center', flex: 1, gap: 10, justifyContent: 'center', paddingHorizontal: 32 },
   stateTitle: { color: colors.text, fontFamily: fontFamilies.bodyBold, fontSize: fontSizes.bodyLarge },
@@ -507,7 +566,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.forest,
     paddingBottom: 19,
     paddingHorizontal: 20,
-    paddingTop: 28,
+    paddingTop: 18,
   },
   statusRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
   statusPill: {
@@ -532,8 +591,8 @@ const styles = StyleSheet.create({
   heading: {
     color: colors.surface,
     fontFamily: fontFamilies.display,
-    fontSize: fontSizes.pageTitle,
-    lineHeight: lineHeights.pageTitle,
+    fontSize: fontSizes.sectionTitle,
+    lineHeight: lineHeights.sectionTitle,
     marginTop: 9,
   },
   eta: {
@@ -593,7 +652,7 @@ const styles = StyleSheet.create({
   progressSegment: { backgroundColor: colors.timelinePending, borderRadius: 99, flex: 1, height: 4 },
   progressSegmentActive: { backgroundColor: colors.forest },
   timeline: { marginTop: 18 },
-  timelineItem: { flexDirection: 'row', minHeight: 74 },
+  timelineItem: { flexDirection: 'row', minHeight: 68 },
   timelineItemWithMessage: { minHeight: 82 },
   markerColumn: { alignItems: 'center', width: 21 },
   marker: {
@@ -620,8 +679,10 @@ const styles = StyleSheet.create({
     borderWidth: 2,
   },
   timelineLine: { backgroundColor: colors.timeline, flex: 1, marginTop: 4, width: 1 },
-  timelineCopy: { flex: 1, gap: 3, marginLeft: 13 },
+  timelineCopy: { flex: 1, gap: 4, marginLeft: 13, paddingBottom: 22 },
+  timelineTitleRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 },
   timelineTitle: {
+    flexShrink: 1,
     color: colors.text,
     fontFamily: fontFamilies.bodyBold,
     fontSize: fontSizes.bodySmall,

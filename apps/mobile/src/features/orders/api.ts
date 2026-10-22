@@ -1,9 +1,10 @@
+import { invalidateOrderLists } from './listCache';
 import { apiGet, apiPatch, apiPost } from '@/lib/api';
 import type { ExploreRequest } from '@/features/explore/api';
 
 export type OrderStatus =
   | 'draft' | 'open' | 'accepted' | 'shopping'
-  | 'delivering' | 'completed' | 'cancelled' | 'disputed';
+  | 'delivering' | 'delivered' | 'completed' | 'cancelled' | 'disputed';
 
 export type OrderSummary = {
   id: string;
@@ -51,8 +52,8 @@ export type OrderDetail = ExploreRequest & {
   status: OrderStatus;
 };
 
-export async function listMyOrders(limit = 50): Promise<OrderSummary[]> {
-  return apiGet<OrderSummary[]>('/api/v1/orders', { limit });
+export async function listMyOrders(limit = 50, scope: 'all' | 'active' | 'history' = 'all'): Promise<OrderSummary[]> {
+  return apiGet<OrderSummary[]>('/api/v1/orders', { limit, scope });
 }
 
 export function getOrderTracking(requestId: string) {
@@ -67,17 +68,17 @@ export function getOrderDetail(
 }
 
 export function acceptOrder(requestId: string) {
-  return apiPost<OrderActionResult>(`/api/v1/orders/${requestId}/accept`);
+  return apiPost<OrderActionResult>(`/api/v1/orders/${requestId}/accept`).then(result => { invalidateOrderLists(); return result; });
 }
 
 export function releaseOrder(requestId: string) {
-  return apiPost<OrderActionResult>(`/api/v1/orders/${requestId}/release`);
+  return apiPost<OrderActionResult>(`/api/v1/orders/${requestId}/release`).then(result => { invalidateOrderLists(); return result; });
 }
 
 export function publishOrder(requestId: string) {
-  return apiPost<OrderActionResult>(`/api/v1/orders/${requestId}/publish`);
+  return apiPost<OrderActionResult>(`/api/v1/orders/${requestId}/publish`).then(result => { invalidateOrderLists(); return result; });
 }
 
 export function transitionOrder(requestId: string, status: OrderStatus) {
-  return apiPatch<OrderActionResult>(`/api/v1/orders/${requestId}/status`, { status });
+  return apiPatch<OrderActionResult>(`/api/v1/orders/${requestId}/status`, { status }).then(result => { if (status !== 'cancelled') invalidateOrderLists(); return result; });
 }

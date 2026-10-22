@@ -1,3 +1,4 @@
+import { invalidateOrderLists } from '@/features/orders/listCache';
 import { apiGet, apiPatch, apiPost } from '@/lib/api';
 import type { OrderActionResult } from '@/features/orders/api';
 import type { OrderAddressSnapshot } from '@/features/addresses/addressForm';
@@ -43,7 +44,7 @@ export function buildRequestBody(form: RequestForm, submissionKey: string, now =
 }
 
 export function createAndPublishRequest(body: CreateRequestBody, userId: string) {
-  return apiPost<OrderActionResult>('/api/v1/orders', body, userId);
+  return apiPost<OrderActionResult>('/api/v1/orders', body, userId).then(result => { invalidateOrderLists(); return result; });
 }
 
 export type EditableRequest = {
@@ -55,5 +56,5 @@ export type EditableRequest = {
 export type EditRequestBody = CreateRequestBody & { expectedUpdatedAt: string; items: Array<CreateRequestBody['items'][number] & { id?: string }> };
 export function getEditableRequest(id: string) { return apiGet<EditableRequest>(`/api/v1/orders/${id}/edit`); }
 export function updateRequest(id: string, body: EditRequestBody, userId: string) {
-  return apiPatch<OrderActionResult>(`/api/v1/orders/${id}`, body, userId);
+  return apiPatch<OrderActionResult>(`/api/v1/orders/${id}`, body, userId).then(result => { invalidateOrderLists(); return result; });
 }

@@ -1,5 +1,5 @@
 import type { ComponentProps } from 'react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -27,7 +27,7 @@ const BEN_NGHE_CENTER = { latitude: 10.7798, longitude: 106.7009 };
 const itemColors = [colors.vegetable, colors.meat, colors.egg, colors.softPeach];
 const detailStatusLabels: Record<OrderStatus, string> = {
   draft: 'Bản nháp', open: 'Đang tìm người đi chợ', accepted: 'Đã có người nhận',
-  shopping: 'Đang đi chợ', delivering: 'Đang giao hàng', completed: 'Đã hoàn thành',
+  shopping: 'Đang đi chợ', delivering: 'Đang giao hàng', delivered: 'Chờ xác nhận nhận hàng', completed: 'Đã hoàn thành',
   cancelled: 'Đã hủy', disputed: 'Đang xử lý sự cố',
 };
 
@@ -140,25 +140,28 @@ export default function RequestDetailsScreen() {
   const [expanded, setExpanded] = useState(false);
   const [accepting, setAccepting] = useState(false);
 
+  const loadedRequest = useRef<{ id: string; at: number } | null>(null);
   const loadRequest = useCallback(async () => {
     if (!id) {
       setError('Không tìm thấy mã yêu cầu.');
       setLoading(false);
       return;
     }
-    setLoading(true);
+    const hasData = loadedRequest.current?.id === id;
+    if (!hasData) { setLoading(true); setParticipantStatus(null); setRequest(null); }
     setError(null);
     setUnavailable(false);
-    setParticipantStatus(null);
-    setRequest(null);
     try {
       setRequest(await getExploreRequest(id, BEN_NGHE_CENTER));
+      loadedRequest.current = { id, at: Date.now() };
+      setParticipantStatus(null);
     } catch (loadError) {
       const message = loadError instanceof Error ? loadError.message : '';
       if (message === 'Request not found') {
         try {
           const orderDetail = await getOrderDetail(id, BEN_NGHE_CENTER);
           setRequest(orderDetail);
+          loadedRequest.current = { id, at: Date.now() };
           setParticipantStatus(orderDetail.status);
           return;
         } catch (orderError) {
@@ -171,6 +174,7 @@ export default function RequestDetailsScreen() {
       }
       const requestUnavailable = message === 'Request not found';
       if (requestUnavailable && id) markExploreRequestUnavailable(id);
+      if (requestUnavailable) { loadedRequest.current = null; setRequest(null); }
       setUnavailable(requestUnavailable);
       setError(requestUnavailable
         ? 'Yêu cầu này vừa được người khác nhận và không còn trong danh sách Khám phá.'
@@ -180,7 +184,7 @@ export default function RequestDetailsScreen() {
     }
   }, [id]);
 
-  useFocusEffect(useCallback(() => { void loadRequest(); }, [loadRequest]));
+  useFocusEffect(useCallback(() => { if (loadedRequest.current?.id !== id || Date.now() - loadedRequest.current.at >= 30_000) void loadRequest(); }, [loadRequest, id]));
 
   const shoppingItems = useMemo(() => (request?.items ?? []).map((item, index): DisplayItem => ({
     ...item,
@@ -233,7 +237,7 @@ export default function RequestDetailsScreen() {
           <ActivityIndicator color={colors.coral} size="large" />
           <Text style={styles.stateDescription}>Đang tải chi tiết yêu cầu...</Text>
         </View>
-      ) : error || !request ? (
+      ) : !request ? (
         <View style={styles.stateContainer}>
           <Text style={styles.stateTitle}>Không thể tải yêu cầu</Text>
           <Text style={styles.stateDescription}>{error ?? 'Không tìm thấy dữ liệu yêu cầu.'}</Text>
@@ -245,6 +249,7 @@ export default function RequestDetailsScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+        {error && <Text accessibilityRole="alert" style={styles.stateDescription}>{error}</Text>}
         <LinearGradient
           colors={['#FFE8B4', '#F5A466']}
           end={{ x: 1, y: 1 }}
@@ -274,7 +279,10 @@ export default function RequestDetailsScreen() {
             </View>
             <Pressable
               accessibilityRole="button"
-              style={({ pressed }) => [styles.messageButton, pressed && styles.pressed]}
+              disabled={!participantStatus || participantStatus === 'draft' || participantStatus === 'open'}
+              accessibilityState={{ disabled: !participantStatus || participantStatus === 'draft' || participantStatus === 'open' }}
+              onPress={() => router.push(`/requests/${id}/chat`)}
+              style={({ pressed }) => [styles.messageButton, (!participantStatus || participantStatus === 'draft' || participantStatus === 'open') && { opacity: 0.4 }, pressed && styles.pressed]}
             >
               <Text style={styles.messageButtonText}>Nhắn tin</Text>
             </Pressable>

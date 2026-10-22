@@ -52,6 +52,7 @@ const menuItems: Array<{
   subtitle: string;
   symbol: SymbolName;
 }> = [
+  { title: 'Lịch sử đơn hàng', subtitle: 'Đơn đã hoàn tất và đã hủy', symbol: { ios: 'clock', android: 'history', web: 'history' } },
   {
     title: 'Địa chỉ của tôi',
     subtitle: 'Nhà, Công ty',
@@ -89,15 +90,17 @@ function AppIcon({ name, size = 18, color = colors.coral }: {
   );
 }
 
-function MenuRow({ title, subtitle, symbol, isLast }: {
+function MenuRow({ title, subtitle, symbol, isLast, onPress }: {
   title: string;
   subtitle: string;
   symbol: SymbolName;
   isLast: boolean;
+  onPress?: () => void;
 }) {
   return (
     <Pressable
       accessibilityRole="button"
+      onPress={onPress}
       style={({ pressed }) => [styles.menuRow, !isLast && styles.menuDivider, pressed && styles.pressed]}
     >
       <View style={styles.menuIcon}>
@@ -237,6 +240,7 @@ export default function ProfileScreen() {
             <MenuRow
               key={item.title}
               {...item}
+              onPress={item.title === 'Lịch sử đơn hàng' ? () => router.push('/account/order-history') : undefined}
               isLast={index === menuItems.length - 1}
             />
           ))}

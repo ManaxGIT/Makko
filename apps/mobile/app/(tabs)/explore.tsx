@@ -1,6 +1,6 @@
 import type { ComponentProps } from 'react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -126,21 +126,32 @@ export default function ExploreScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const loaded = useRef(false);
+  const searchVersion = useRef(0);
+  const [refreshing, setRefreshing] = useState(false);
+  const [pullRefreshing, setPullRefreshing] = useState(false);
   const loadRequests = useCallback(async (searchQuery: string) => {
-    setLoading(true);
+    const version = ++searchVersion.current;
+    if (!loaded.current) setLoading(true);
+    setRefreshing(true);
     setError(null);
     try {
-      setRequests(await listExploreRequests({ query: searchQuery, ...BEN_NGHE_CENTER }));
+      const result = await listExploreRequests({ query: searchQuery, ...BEN_NGHE_CENTER });
+      if (searchVersion.current !== version) return;
+      loaded.current = true;
+      setRequests(result);
+      return true;
     } catch (loadError) {
+      if (searchVersion.current !== version) return;
       setError(loadError instanceof Error ? loadError.message : 'Không thể tải yêu cầu lúc này.');
     } finally {
-      setLoading(false);
+      if (searchVersion.current === version) { setLoading(false); setRefreshing(false); }
     }
   }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => { void loadRequests(query); }, 300);
-    return () => clearTimeout(timer);
+    return () => { clearTimeout(timer); searchVersion.current += 1; };
   }, [loadRequests, query]);
 
   useFocusEffect(useCallback(() => {
@@ -148,9 +159,10 @@ export default function ExploreScreen() {
   }, []));
 
   const refreshRequests = useCallback(async () => {
-    clearUnavailableExploreRequests();
-    setUnavailableRequestIds(new Set());
-    await loadRequests(query);
+    if (await loadRequests(query)) {
+      clearUnavailableExploreRequests();
+      setUnavailableRequestIds(new Set());
+    }
   }, [loadRequests, query]);
 
   const visibleRequests = useMemo(() => {
@@ -167,7 +179,7 @@ export default function ExploreScreen() {
 
   return (
     <SafeAreaView edges={['top']} style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+      <ScrollView refreshControl={<RefreshControl refreshing={pullRefreshing} onRefresh={() => { setPullRefreshing(true); void refreshRequests().finally(() => setPullRefreshing(false)); }} tintColor={colors.forest} />} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <View><Text style={styles.eyebrow}>KHÁM PHÁ QUANH BẠN</Text><Text style={styles.heading}>Ai đang cần giúp?</Text></View>
           <Pressable accessibilityLabel="Xem thông báo" style={styles.iconButton}>
@@ -198,8 +210,8 @@ export default function ExploreScreen() {
         <View style={styles.resultsHeader}>
           <View><Text style={styles.resultTitle}>Yêu cầu gần bạn</Text><Text style={styles.resultCount}>{visibleRequests.length} yêu cầu phù hợp</Text></View>
           <View style={styles.resultActions}>
-            <Pressable accessibilityLabel="Tải lại danh sách yêu cầu" accessibilityRole="button" disabled={loading} onPress={refreshRequests} style={({ pressed }) => [styles.reloadButton, (pressed || loading) && styles.pressed]}>
-              {loading ? <ActivityIndicator color={colors.coral} size="small" /> : <Icon color={colors.coral} name={{ ios: 'arrow.clockwise', android: 'refresh', web: 'refresh' }} size={15} />}
+            <Pressable accessibilityLabel="Tải lại danh sách yêu cầu" accessibilityRole="button" disabled={refreshing} onPress={refreshRequests} style={({ pressed }) => [styles.reloadButton, (pressed || loading) && styles.pressed]}>
+              {refreshing ? <ActivityIndicator color={colors.coral} size="small" /> : <Icon color={colors.coral} name={{ ios: 'arrow.clockwise', android: 'refresh', web: 'refresh' }} size={15} />}
             </Pressable>
             <Pressable accessibilityRole="button" onPress={() => setNearest((value) => !value)} style={({ pressed }) => [styles.sortButton, pressed && styles.pressed]}>
               <Icon color={colors.coral} name={{ ios: 'arrow.up.arrow.down', android: 'sort', web: 'sort' }} size={14} />
@@ -208,8 +220,9 @@ export default function ExploreScreen() {
           </View>
         </View>
 
+        {error && loaded.current && <Text accessibilityRole="alert" style={styles.emptyText}>{error}</Text>}
         <View style={styles.list}>
-          {loading ? <View style={styles.loadingState}><ActivityIndicator color={colors.coral} /><Text style={styles.emptyText}>Đang tìm yêu cầu quanh bạn...</Text></View> : error ? (
+          {loading ? <View style={styles.loadingState}><ActivityIndicator color={colors.coral} /><Text style={styles.emptyText}>Đang tìm yêu cầu quanh bạn...</Text></View> : error && !loaded.current ? (
             <View style={styles.emptyState}>
               <Text style={styles.emptyTitle}>Không thể tải yêu cầu</Text>
               <Text style={styles.emptyText}>{error}</Text>

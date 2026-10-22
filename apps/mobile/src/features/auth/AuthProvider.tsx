@@ -1,6 +1,7 @@
 import { createContext, type ReactNode, useContext, useEffect, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 
+import { clearOrderLists } from '@/features/orders/listCache';
 import { supabase } from '@/lib/supabase';
 
 type AuthContextValue = {
@@ -15,12 +16,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    let accountId: string | undefined;
     supabase.auth.getSession().then(({ data }) => {
+      accountId = data.session?.user.id;
       setSession(data.session);
       setIsLoading(false);
     });
 
     const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      if (accountId !== nextSession?.user.id) clearOrderLists();
+      accountId = nextSession?.user.id;
       setSession(nextSession);
       setIsLoading(false);
     });
