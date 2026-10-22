@@ -1,20 +1,22 @@
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.dependencies.auth import get_current_user
 from app.dependencies.repositories import get_repository
 from app.models.user import CurrentUser
 from app.repositories.supabase import SupabaseRepository
 from app.schemas.orders import OrderActionResult, OrderDetail, OrderSummary, OrderTracking, TransitionOrderBody
+from app.services.chat import ChatService
+from app.schemas.chat import ChatConversation, ChatMessage, SendMessageBody
 from app.services.marketplace import MarketplaceService
 from app.services.create_request import CreateRequestService
 from app.schemas.create_request import CreateRequestBody
 from app.schemas.edit_request import EditableRequest, EditRequestBody
 from app.services.edit_request import EditRequestService
 
-from app.schemas.purchase_evidence import EvidencePhoto, SubmitEvidenceBody
+from app.schemas.purchase_evidence import EvidencePhoto, SubmitEvidenceBody, SubmitDeliveryEvidenceBody
 from app.services.purchase_evidence import PurchaseEvidenceService
 
 router = APIRouter(prefix="/orders", tags=["orders"])
@@ -53,8 +55,9 @@ async def list_orders(
     user: Annotated[CurrentUser, Depends(get_current_user)],
     repository: Annotated[SupabaseRepository, Depends(get_repository)],
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    scope: Literal["all", "active", "history"] = "all",
 ) -> list[OrderSummary]:
-    return await MarketplaceService(repository).list_orders(user.id, limit=limit)
+    return await MarketplaceService(repository).list_orders(user.id, limit=limit, scope=scope)
 
 
 @router.get("/{request_id}/tracking", response_model=OrderTracking, response_model_by_alias=True)
@@ -139,3 +142,37 @@ async def submit_purchase_evidence(
     repository: Annotated[SupabaseRepository, Depends(get_repository)],
 ) -> OrderActionResult:
     return await PurchaseEvidenceService(repository).submit(request_id, body, user.access_token)
+
+
+@router.post('/{request_id}/delivery-evidence', response_model=OrderActionResult, response_model_by_alias=True)
+async def submit_delivery_evidence(
+    request_id: UUID,
+    body: SubmitDeliveryEvidenceBody,
+    user: Annotated[CurrentUser, Depends(get_current_user)],
+    repository: Annotated[SupabaseRepository, Depends(get_repository)],
+) -> OrderActionResult:
+    return await PurchaseEvidenceService(repository).submit_delivery(request_id, body, user.access_token)
+
+
+@router.get('/{request_id}/chat', response_model=ChatConversation, response_model_by_alias=True)
+async def get_order_chat(
+    request_id: UUID,
+    user: Annotated[CurrentUser, Depends(get_current_user)],
+    repository: Annotated[SupabaseRepository, Depends(get_repository)],
+    before: Annotated[int | None, Query(ge=1, le=9223372036854775807)] = None,
+    after: Annotated[int | None, Query(ge=1, le=9223372036854775807)] = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+) -> ChatConversation:
+    if before is not None and after is not None:
+        raise HTTPException(422, 'Chỉ dùng một mốc phân trang.')
+    return await ChatService(repository).get(request_id, user.id, before=before, after=after, limit=limit)
+
+
+@router.post('/{request_id}/chat/messages', response_model=ChatMessage, response_model_by_alias=True, status_code=201)
+async def send_order_message(
+    request_id: UUID,
+    body: SendMessageBody,
+    user: Annotated[CurrentUser, Depends(get_current_user)],
+    repository: Annotated[SupabaseRepository, Depends(get_repository)],
+) -> ChatMessage:
+    return await ChatService(repository).send(request_id, body, user.access_token)

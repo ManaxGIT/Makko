@@ -48,3 +48,38 @@ async def test_evidence_list_checks_participation_first():
     with pytest.raises(LookupError):
         await PurchaseEvidenceService(repo).list(ID, USER.id)
     assert repo.calls == ['shopping_requests']
+
+DELIVERY_BODY = {'photos': [{'kind': 'delivery', 'storagePath': f'{USER.id}/{ID}/handoff.jpg'}]}
+
+
+def test_delivery_evidence_uses_one_user_rpc(api):
+    client, repo, _ = api
+    response = client.post(f'/api/v1/orders/{ID}/delivery-evidence', json=DELIVERY_BODY)
+    assert response.status_code == 200
+    function, payload, token = repo.calls[0]
+    assert function == 'submit_delivery_evidence'
+    assert payload == {'target_request_id': ID, 'photos': [{'kind': 'delivery', 'storage_path': DELIVERY_BODY['photos'][0]['storagePath']}]}
+    assert token == USER.access_token
+    assert len(repo.calls) == 1
+
+
+@pytest.mark.parametrize('photos', [[], [{'kind': 'goods', 'storagePath': 'path'}], [{'kind': 'receipt', 'storagePath': 'path'}], [{'kind': 'delivery', 'storagePath': ''}], [{'kind': 'delivery', 'storagePath': 'path'}] * 21])
+def test_delivery_rejects_invalid_photos(api, photos):
+    client, repo, _ = api
+    assert client.post(f'/api/v1/orders/{ID}/delivery-evidence', json={'photos': photos}).status_code == 422
+    assert not repo.calls
+
+
+def test_purchase_rejects_delivery_kind(api):
+    client, repo, _ = api
+    assert client.post(f'/api/v1/orders/{ID}/evidence', json={**BODY, **DELIVERY_BODY}).status_code == 422
+    assert not repo.calls
+
+
+@pytest.mark.parametrize('message,status', [('request_not_found',404), ('request_not_delivering',409), ('delivery_photo_required',422), ('invalid_evidence',422)])
+def test_delivery_errors_are_actionable(api, message, status):
+    client, repo, _ = api
+    repo.error = message
+    result = client.post(f'/api/v1/orders/{ID}/delivery-evidence', json=DELIVERY_BODY)
+    assert result.status_code == status
+    assert result.json()['detail'] != message

@@ -1,7 +1,7 @@
 from uuid import UUID
 from fastapi import HTTPException
 from app.repositories.supabase import SupabaseError, SupabaseRepository
-from app.schemas.purchase_evidence import EvidencePhoto, SubmitEvidenceBody
+from app.schemas.purchase_evidence import EvidencePhoto, SubmitEvidenceBody, SubmitDeliveryEvidenceBody
 from app.schemas.orders import OrderActionResult
 from app.services.marketplace import MarketplaceService
 
@@ -31,6 +31,26 @@ class PurchaseEvidenceService:
                 'request_not_shopping': (409, 'Đơn không còn ở bước chọn hàng. Vui lòng tải lại.'),
                 'items_not_confirmed': (422, 'Cần xác nhận đủ và đúng từng món trong đơn.'),
                 'goods_photo_required': (422, 'Cần ít nhất một ảnh hàng đã mua.'),
+                'invalid_evidence': (422, 'Ảnh chưa được tải lên đầy đủ hoặc không thuộc đơn này.'),
+            }
+            if str(error) in messages:
+                code, message = messages[str(error)]
+                raise HTTPException(code, message) from error
+            raise
+        return OrderActionResult(**result)
+
+
+    async def submit_delivery(self, request_id: UUID, body: SubmitDeliveryEvidenceBody, token: str) -> OrderActionResult:
+        try:
+            result = await self.repository.rpc_as_user('submit_delivery_evidence', payload={
+                'target_request_id': str(request_id),
+                'photos': [photo.model_dump() for photo in body.photos],
+            }, access_token=token)
+        except SupabaseError as error:
+            messages = {
+                'request_not_found': (404, 'Không tìm thấy đơn bạn đang nhận.'),
+                'request_not_delivering': (409, 'Đơn không còn ở bước giao hàng. Vui lòng tải lại.'),
+                'delivery_photo_required': (422, 'Cần ít nhất một ảnh giao hàng.'),
                 'invalid_evidence': (422, 'Ảnh chưa được tải lên đầy đủ hoặc không thuộc đơn này.'),
             }
             if str(error) in messages:

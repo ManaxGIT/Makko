@@ -7,7 +7,7 @@ from app.schemas.explore import ExploreRequest
 
 
 OrderStatus = Literal[
-    "draft", "open", "accepted", "shopping", "delivering",
+    "draft", "open", "accepted", "shopping", "delivering", "delivered",
     "completed", "cancelled", "disputed",
 ]
 

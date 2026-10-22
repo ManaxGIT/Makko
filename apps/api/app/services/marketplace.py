@@ -3,7 +3,8 @@ from collections import Counter
 from typing import Any
 from uuid import UUID
 
-from app.repositories.supabase import SupabaseRepository
+from fastapi import HTTPException
+from app.repositories.supabase import SupabaseError, SupabaseRepository
 from app.schemas.explore import ExploreItem, ExploreRequest
 from app.schemas.home import HomeDashboard, HomeLocation, HomeProfile
 from app.schemas.orders import (
@@ -196,7 +197,9 @@ class MarketplaceService:
             items=[ExploreItem(**item) for item in items],
         )
 
-    async def list_orders(self, user_id: UUID, *, limit: int) -> list[OrderSummary]:
+    async def list_orders(self, user_id: UUID, *, limit: int, scope: str = "all") -> list[OrderSummary]:
+        status_filter = {"status": "in.(completed,cancelled)"} if scope == "history" else {"status": "not.in.(completed,cancelled)"} if scope == "active" else {}
+        ordering = "completed_at.desc.nullslast,cancelled_at.desc.nullslast,created_at.desc" if scope == "history" else "created_at.desc"
         shopper_assignments = await self.repository.select(
             "request_assignments",
             params={
@@ -207,13 +210,13 @@ class MarketplaceService:
         shopper_request_ids = [row["request_id"] for row in shopper_assignments]
         owned = await self.repository.select(
             "shopping_requests",
-            params={"select": self._order_columns(), "customer_id": f"eq.{user_id}", "limit": "100"},
+            params={"select": self._order_columns(), "customer_id": f"eq.{user_id}", "limit": "100", "order": ordering, **status_filter},
         )
         shopping = []
         if shopper_request_ids:
             shopping = await self.repository.select(
                 "shopping_requests",
-                params={"select": self._order_columns(), "id": f"in.({','.join(shopper_request_ids)})", "limit": "100"},
+                params={"select": self._order_columns(), "id": f"in.({','.join(shopper_request_ids)})", "limit": "100", "order": ordering, **status_filter},
             )
         request_map = {row["id"]: row for row in [*owned, *shopping]}
         request_ids = list(request_map)
@@ -408,11 +411,18 @@ class MarketplaceService:
     async def transition_request(
         self, request_id: UUID, target_status: OrderStatus, access_token: str
     ) -> OrderActionResult:
-        await self.repository.rpc_as_user(
-            "transition_request",
-            payload={"target_request_id": str(request_id), "target_status": target_status},
-            access_token=access_token,
-        )
+        try:
+            await self.repository.rpc_as_user(
+                "transition_request",
+                payload={"target_request_id": str(request_id), "target_status": target_status},
+                access_token=access_token,
+            )
+        except SupabaseError as error:
+            if target_status == 'cancelled' and str(error) == 'invalid_status_transition':
+                raise HTTPException(409, 'Không thể xóa: đơn đã có người nhận hoặc không còn chờ nhận. Vui lòng tải lại.') from error
+            if target_status == 'cancelled' and str(error) == 'request_not_found':
+                raise HTTPException(404, 'Không tìm thấy đơn hàng.') from error
+            raise
         return OrderActionResult(request_id=request_id, status=target_status)
 
     async def _profiles(self, ids: list[str]) -> dict[str, dict[str, Any]]:

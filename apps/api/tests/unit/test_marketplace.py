@@ -205,3 +205,53 @@ async def test_explore_without_order_coordinates():
     assert nearby == []
     detail = await service.get_explore_request(UUID(REQUEST_ID), USER_ID, latitude=10.78, longitude=106.70)
     assert detail.distance_meters is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('status', ['delivered', 'completed'])
+async def test_delivery_confirmation_uses_user_transaction(status):
+    from app.schemas.orders import TransitionOrderBody
+    repository = ActionRepository()
+    body = TransitionOrderBody(status=status)
+    result = await MarketplaceService(repository).transition_request(
+        UUID(REQUEST_ID), body.status, 'access-token',
+    )
+    assert repository.function == 'transition_request'
+    assert repository.payload == {'target_request_id': REQUEST_ID, 'target_status': status}
+    assert result.status == status
+
+
+@pytest.mark.asyncio
+async def test_cancel_unaccepted_order_uses_existing_atomic_transition():
+    repository = ActionRepository()
+    result = await MarketplaceService(repository).transition_request(UUID(REQUEST_ID), 'cancelled', 'access-token')
+    assert repository.function == 'transition_request'
+    assert repository.payload == {'target_request_id': REQUEST_ID, 'target_status': 'cancelled'}
+    assert result.status == 'cancelled'
+
+
+@pytest.mark.asyncio
+async def test_cancel_race_returns_conflict():
+    from fastapi import HTTPException
+    from app.repositories.supabase import SupabaseError
+    class Rejected(ActionRepository):
+        async def rpc_as_user(self, *args, **kwargs):
+            raise SupabaseError('invalid_status_transition')
+    with pytest.raises(HTTPException) as error:
+        await MarketplaceService(Rejected()).transition_request(UUID(REQUEST_ID), 'cancelled', 'token')
+    assert error.value.status_code == 409
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('scope,expected', [('active','not.in.(completed,cancelled)'), ('history','in.(completed,cancelled)')])
+async def test_order_scope_filters_before_limit(scope, expected):
+    class EmptyRepository:
+        def __init__(self): self.calls = []
+        async def select(self, table, *, params):
+            self.calls.append((table, params))
+            return []
+    repository = EmptyRepository()
+    assert await MarketplaceService(repository).list_orders(USER_ID, limit=50, scope=scope) == []
+    request_query = next(params for table, params in repository.calls if table == 'shopping_requests')
+    assert request_query['status'] == expected
+    assert request_query['customer_id'] == f'eq.{USER_ID}'
