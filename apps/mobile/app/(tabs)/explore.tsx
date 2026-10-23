@@ -7,6 +7,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ExploreRequest, listExploreRequests } from '@/features/explore/api';
 import { clearUnavailableExploreRequests, getUnavailableExploreRequestIds } from '@/features/explore/unavailableRequests';
+import { useAuth } from '@/features/auth/AuthProvider';
+import { useCurrentLocation } from '@/features/location/LocationProvider';
 import { colors } from '@/theme/colors';
 import { fontFamilies, fontSizes, letterSpacing, lineHeights } from '@/theme/typography';
 
@@ -19,7 +21,6 @@ type Request = {
 };
 
 const categories: Category[] = ['Tất cả', 'Rau củ', 'Thịt cá', 'Trái cây', 'Đồ khô'];
-const BEN_NGHE_CENTER = { latitude: 10.7798, longitude: 106.7009 };
 const categoryKeywords: Record<Exclude<Category, 'Tất cả'>, string[]> = {
   'Rau củ': ['rau', 'củ', 'cải', 'hành', 'khoai'],
   'Thịt cá': ['thịt', 'cá', 'tôm', 'gà', 'bò', 'heo'],
@@ -29,8 +30,8 @@ const categoryKeywords: Record<Exclude<Category, 'Tất cả'>, string[]> = {
 
 function formatDistance(distance: number | null) {
   if (distance === null) return 'Chưa rõ khoảng cách';
-  if (distance < 1000) return `${Math.round(distance / 10) * 10}m`;
-  return `${(distance / 1000).toLocaleString('vi-VN', { maximumFractionDigits: 1 })}km`;
+  if (distance < 1000) return `≈ ${Math.round(distance / 10) * 10}m`;
+  return `≈ ${(distance / 1000).toLocaleString('vi-VN', { maximumFractionDigits: 1 })}km`;
 }
 
 function formatDeadline(value: string | null) {
@@ -118,6 +119,12 @@ function RequestCard({ request }: { request: Request }) {
 }
 
 export default function ExploreScreen() {
+  const { session } = useAuth();
+  return <AccountExploreScreen key={session?.user.id ?? 'signed-out'} />;
+}
+
+function AccountExploreScreen() {
+  const { coordinates, locating, error: locationError, locate } = useCurrentLocation();
   const [category, setCategory] = useState<Category>('Tất cả');
   const [query, setQuery] = useState('');
   const [nearest, setNearest] = useState(true);
@@ -127,6 +134,7 @@ export default function ExploreScreen() {
   const [error, setError] = useState<string | null>(null);
 
   const loaded = useRef(false);
+  const pendingReads = useRef(new Map<string, Promise<ExploreRequest[]>>());
   const searchVersion = useRef(0);
   const [refreshing, setRefreshing] = useState(false);
   const [pullRefreshing, setPullRefreshing] = useState(false);
@@ -136,7 +144,14 @@ export default function ExploreScreen() {
     setRefreshing(true);
     setError(null);
     try {
-      const result = await listExploreRequests({ query: searchQuery, ...BEN_NGHE_CENTER });
+      const params = { query: searchQuery, ...(coordinates ?? {}) };
+      const key = JSON.stringify(params);
+      let pending = pendingReads.current.get(key);
+      if (!pending) {
+        pending = listExploreRequests(params).finally(() => { pendingReads.current.delete(key); });
+        pendingReads.current.set(key, pending);
+      }
+      const result = await pending;
       if (searchVersion.current !== version) return;
       loaded.current = true;
       setRequests(result);
@@ -147,7 +162,7 @@ export default function ExploreScreen() {
     } finally {
       if (searchVersion.current === version) { setLoading(false); setRefreshing(false); }
     }
-  }, []);
+  }, [coordinates]);
 
   useEffect(() => {
     const timer = setTimeout(() => { void loadRequests(query); }, 300);
@@ -188,12 +203,14 @@ export default function ExploreScreen() {
           </Pressable>
         </View>
 
-        <Pressable accessibilityRole="button" style={styles.locationCard}>
+        <Pressable accessibilityRole="button" disabled={locating} onPress={() => void locate()} style={styles.locationCard}>
           <View style={styles.locationIcon}><Icon color={colors.coral} name={{ ios: 'location.fill', android: 'location_on', web: 'location_on' }} size={18} /></View>
-          <View style={styles.locationCopy}><Text style={styles.locationLabel}>KHU VỰC ĐANG TÌM</Text><Text style={styles.location}>Phường Bến Nghé · trong 3km</Text></View>
+          <View style={styles.locationCopy}><Text style={styles.locationLabel}>KHU VỰC ĐANG TÌM</Text><Text style={styles.location}>{locating ? 'Đang lấy vị trí…' : coordinates ? 'Vị trí hiện tại · trong 3km' : 'Bật vị trí để tìm đơn gần bạn'}</Text></View>
           <Icon color={colors.muted} name={{ ios: 'chevron.right', android: 'chevron_right', web: 'chevron_right' }} size={16} />
         </Pressable>
 
+        {!!locationError && <Text accessibilityRole="alert" style={styles.emptyText}>{locationError}</Text>}
+        {coordinates && <Text style={styles.emptyText}>Khoảng cách ước tính theo đường chim bay</Text>}
         <View style={styles.searchBox}>
           <Icon name={{ ios: 'magnifyingglass', android: 'search', web: 'search' }} size={19} />
           <TextInput accessibilityLabel="Tìm yêu cầu" onChangeText={setQuery} placeholder="Tìm món đồ hoặc người đăng..." placeholderTextColor={colors.mutedLight} style={styles.searchInput} value={query} />

@@ -107,7 +107,7 @@ class MarketplaceService:
             results.sort(key=lambda item: item.distance_meters if item.distance_meters is not None else math.inf)
         return results[:limit]
 
-    async def get_home_dashboard(self, user_id: UUID, *, nearby_limit: int) -> HomeDashboard:
+    async def get_home_dashboard(self, user_id: UUID, *, nearby_limit: int, latitude: float | None = None, longitude: float | None = None) -> HomeDashboard:
         profile = await self.repository.select_one(
             "profiles",
             params={"select": "id,display_name,avatar_path,account_status", "id": f"eq.{user_id}"},
@@ -124,8 +124,8 @@ class MarketplaceService:
         location = HomeLocation(**address) if address else None
         nearby = await self.list_explore_requests(
             user_id, query=None,
-            latitude=location.latitude if location else None,
-            longitude=location.longitude if location else None,
+            latitude=latitude,
+            longitude=longitude,
             limit=nearby_limit, radius_meters=3_000,
         )
         return HomeDashboard(

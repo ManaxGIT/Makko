@@ -51,3 +51,16 @@ Trường hợp thiếu/thay món chặn tiếp tục; luồng hai bên xác nh�
 được mô phỏng. Phí 25.000đ giữ từ mẫu trước, không phải mức phí mới được chốt.
 Ảnh minh họa được ghi nhãn. Không tải lên server, đăng đơn hoặc thanh toán thật.
 Mở tại `http://127.0.0.1:4173/purchase-proof.html`.
+
+## Trang chủ và Hôm nay ăn gì
+
+`today-meal.html` gồm ba khung trang chủ, nhu cầu và chọn món. Chọn món rồi
+bấm “Tiếp tục tạo yêu cầu” để chuyển nguyên liệu theo khẩu phần và giá gợi ý
+vào `create-request.html` qua URL fragment. Tái sử dụng luồng sửa danh sách,
+giao hàng & chi phí, kiểm tra và đăng hiện có; không có màn đăng riêng cho AI.
+Dữ liệu minh họa, chưa gọi Gemini, tạo đơn thật hoặc triển khai vào mobile.
+
+Bước xác nhận cuối trong `create-request.html?step=3` dùng bố cục tổng hợp
+chỉ đọc: món, ghi chú/thay thế, giao hàng, thanh toán và chi phí. Không có nút
+sửa hay ô nhập tại bước này; quay lại bước trước để chỉnh. Tổng và nút đăng
+được giữ ở chân màn hình. Đây vẫn là prototype, chưa cập nhật mobile.

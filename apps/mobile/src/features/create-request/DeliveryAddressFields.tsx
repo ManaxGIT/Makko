@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 
 import { getProvinces, getWards, Province, Ward } from '@/features/addresses/api';
+import { useCurrentLocation, Coordinates } from '@/features/location/LocationProvider';
 import { colors } from '@/theme/colors';
 import { fontFamilies, fontSizes, lineHeights } from '@/theme/typography';
 
@@ -50,6 +51,12 @@ function Dropdown<T extends Province>({ label, value, options, placeholder, disa
 }
 
 export function DeliveryAddressFields({ value, onChange }: { value: DeliveryAddress; onChange: (address: DeliveryAddress) => void }) {
+  const { locate, locating, error: locationError } = useCurrentLocation();
+  const currentValue = useRef(value);
+  currentValue.current = value;
+  function selectPoint(point: Coordinates) {
+    onChange({ ...currentValue.current, coordinates: point });
+  }
   const [provinces, setProvinces] = useState<Province[]>([]);
   const [wardResult, setWardResult] = useState<{ provinceCode: string; rows: Ward[] } | null>(null);
   const [provinceLoading, setProvinceLoading] = useState(true);
@@ -83,6 +90,17 @@ export function DeliveryAddressFields({ value, onChange }: { value: DeliveryAddr
   }, [provinceCode, wardAttempt]);
 
   return <>
+    <View style={styles.field}>
+      <Text style={styles.label}>Vị trí nhận hàng · Không bắt buộc</Text>
+      <Text style={styles.text}>Nếu nhận hàng tại nơi bạn đang đứng, dùng GPS để lưu vị trí. Địa chỉ chữ vẫn nhập thủ công bên dưới.</Text>
+      <Pressable accessibilityRole="button" disabled={locating} onPress={async () => { const point = await locate(); if (point) selectPoint(point); }} style={styles.input}><Text style={styles.label}>{locating ? 'Đang lấy vị trí…' : 'Dùng vị trí hiện tại'}</Text></Pressable>
+      {!!locationError && <Text accessibilityRole="alert" style={styles.error}>{locationError}</Text>}
+      {value.coordinates && <>
+        <Text style={styles.text}>Đã lưu tọa độ: {value.coordinates.latitude.toFixed(5)}, {value.coordinates.longitude.toFixed(5)}. Chỉ dùng tọa độ này nếu đúng nơi nhận hàng.</Text>
+        <Pressable accessibilityRole="button" onPress={() => onChange({ ...value, coordinates: null })}><Text style={styles.label}>Bỏ vị trí đã lưu</Text></Pressable>
+      </>}
+      {!value.coordinates && <Text style={styles.text}>Chưa chọn điểm: đơn vẫn đăng được nhưng chưa có khoảng cách.</Text>}
+    </View>
     <Dropdown label="Tỉnh / Thành phố" value={value.province} options={provinces} placeholder="Chọn tỉnh / thành phố" loading={provinceLoading} error={provinceError} expanded={open === 'province'} onToggle={() => setOpen(open === 'province' ? null : 'province')} onRetry={() => setProvinceAttempt(n => n + 1)} onSelect={province => {
       onChange({ ...value, province, ward: province.code === provinceCode ? value.ward : null });
       setOpen('ward');

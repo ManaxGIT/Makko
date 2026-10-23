@@ -254,3 +254,40 @@ prevents subsequent acceptance. If acceptance already won, cancellation returns
 409 and the client reloads the list. No hard-delete endpoint is introduced.
 `supabase/tests/cancel_unaccepted_order.sql` verifies ownership and both operation
 orders with rolled-back synthetic rows; it does not run a two-session stress test.
+
+## Device coordinates for nearby requests
+
+`GET /api/v1/home` accepts optional `latitude`/`longitude`, like Explore;
+nearby distances use these device coordinates rather than the saved home address.
+The saved-address and publication contracts continue to accept null coordinates.
+Addresses are entered manually; the API does not call Google Geocoding.
+
+## Hôm nay ăn gì (Gemini)
+
+`POST /api/v1/meals/suggestions` yêu cầu Bearer session hiện có. Body:
+
+```json
+{"meal":"Bữa tối","people":2,"budget":100000,"avoid":"Không ăn tôm","pantry":"Gạo, dầu ăn, gia vị","style":"Món Tây, muốn thử món mới"}
+```
+
+Kết quả `suggestions` gồm `title`, `description`, `cookingMinutes`,
+`suggestedGoodsAmount` (VND, chỉ là tham khảo) và `ingredients` (`name`,
+`quantity`, `unit`) cho toàn bộ khẩu phần. Tên bữa có thể tự nhập. Backend
+kiểm tra cấu trúc/định lượng, nguyên liệu trùng và giá không vượt ngân sách.
+Các sở thích/kiêng được gửi cho mô hình làm ngữ cảnh, không phải bảo đảm dinh
+dưỡng hay giá thị trường đã xác minh.
+
+Đặt `GEMINI_API_KEY` trong `.env` backend (được Git bỏ qua) và
+`GEMINI_MODEL=gemini-3.1-flash-lite`. Không đưa key vào `EXPO_PUBLIC_*`.
+Khởi động lại FastAPI sau khi đổi cấu hình; biến thiếu không làm ứng dụng lỗi
+khởi động, endpoint trả 503. Hạn mức Gemini trả 429; kết quả không hợp lệ/lỗi
+nhà cung cấp trả 502; timeout trả 504. Không tự thử lại để tránh phát sinh
+thêm lượt gọi. Không gửi địa chỉ, số điện thoại hay token đăng nhập đến Gemini.
+
+API không lưu gợi ý vào database, không đăng đơn và không thêm RPC. Chọn món
+trên app sẽ điền danh sách và giá tham khảo vào luồng tạo yêu cầu hiện có;
+người dùng sửa, chốt tiền/giao hàng và xác nhận trước khi đăng.
+
+`style` là chuỗi tùy chọn (tối đa 1000 ký tự) cho loại món, phong cách ẩm thực
+và mong muốn đổi vị. Bỏ qua trường này vẫn tương thích. Pantry không giới hạn
+mọi gợi ý vào cùng nguyên liệu; avoid và ngân sách vẫn có ưu tiên cao hơn style.

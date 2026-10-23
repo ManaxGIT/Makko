@@ -255,3 +255,45 @@ async def test_order_scope_filters_before_limit(scope, expected):
     request_query = next(params for table, params in repository.calls if table == 'shopping_requests')
     assert request_query['status'] == expected
     assert request_query['customer_id'] == f'eq.{USER_ID}'
+
+
+async def test_nearest_requests_use_device_coordinates_and_radius():
+    class LocatedRepository(FakeRepository):
+        async def select(self, table, *, params):
+            rows = await super().select(table, params=params)
+            if table == 'shopping_requests':
+                base = rows[0]
+                return [
+                    {**base, 'id': '00000000-0000-0000-0000-000000000001', 'delivery_latitude': 10.79},
+                    {**base, 'id': '00000000-0000-0000-0000-000000000002', 'delivery_latitude': None, 'delivery_longitude': None},
+                    {**base, 'id': '00000000-0000-0000-0000-000000000003', 'delivery_latitude': 10.781},
+                    {**base, 'id': '00000000-0000-0000-0000-000000000004', 'delivery_latitude': 11.0},
+                ]
+            return rows
+
+    service = MarketplaceService(LocatedRepository())
+    results = await service.list_explore_requests(
+        USER_ID, query=None, latitude=10.78, longitude=106.70, limit=20, radius_meters=3000,
+    )
+    assert [str(row.id)[-1] for row in results] == ['3', '1']
+    assert results[0].distance_meters == pytest.approx(111.2, abs=1)
+    no_gps = await service.list_explore_requests(
+        USER_ID, query=None, latitude=None, longitude=None, limit=20, radius_meters=3000,
+    )
+    assert len(no_gps) == 4
+    assert all(row.distance_meters is None for row in no_gps)
+
+
+async def test_home_does_not_use_saved_address_as_current_gps():
+    class HomeRepository(FakeRepository):
+        async def select(self, table, *, params):
+            if table == 'addresses':
+                return [{'ward': 'Phường Sài Gòn', 'district': None, 'city': 'TP. Hồ Chí Minh',
+                         'latitude': 10.78, 'longitude': 106.70}]
+            return await super().select(table, params=params)
+
+    service = MarketplaceService(HomeRepository())
+    without_gps = await service.get_home_dashboard(USER_ID, nearby_limit=5)
+    assert without_gps.nearby_requests[0].distance_meters is None
+    with_gps = await service.get_home_dashboard(USER_ID, nearby_limit=5, latitude=10.781, longitude=106.70)
+    assert with_gps.nearby_requests[0].distance_meters == pytest.approx(111.2, abs=1)

@@ -19,11 +19,11 @@ import { colors } from '@/theme/colors';
 import { fontFamilies, fontSizes } from '@/theme/typography';
 import { ExploreRequest, ExploreRequestItem, getExploreRequest } from '@/features/explore/api';
 import { markExploreRequestUnavailable } from '@/features/explore/unavailableRequests';
+import { useCurrentLocation } from '@/features/location/LocationProvider';
 import { acceptOrder, getOrderDetail, OrderStatus } from '@/features/orders/api';
 
 type SymbolName = ComponentProps<typeof SymbolView>['name'];
 
-const BEN_NGHE_CENTER = { latitude: 10.7798, longitude: 106.7009 };
 const itemColors = [colors.vegetable, colors.meat, colors.egg, colors.softPeach];
 const detailStatusLabels: Record<OrderStatus, string> = {
   draft: 'Bản nháp', open: 'Đang tìm người đi chợ', accepted: 'Đã có người nhận',
@@ -57,8 +57,8 @@ function formatDistance(value: number | null, request: ExploreRequest) {
     return [request.deliveryWard, request.deliveryDistrict, request.deliveryCity].filter(Boolean).join(', ');
   }
   return value < 1000
-    ? `Cách bạn ${Math.round(value / 10) * 10}m`
-    : `Cách bạn ${(value / 1000).toLocaleString('vi-VN', { maximumFractionDigits: 1 })}km`;
+    ? `Cách bạn ≈ ${Math.round(value / 10) * 10}m (đường chim bay)`
+    : `Cách bạn ≈ ${(value / 1000).toLocaleString('vi-VN', { maximumFractionDigits: 1 })}km (đường chim bay)`;
 }
 
 function initials(name: string) {
@@ -131,6 +131,7 @@ function ShoppingItem({
 
 export default function RequestDetailsScreen() {
   const router = useRouter();
+  const { coordinates } = useCurrentLocation();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [request, setRequest] = useState<ExploreRequest | null>(null);
   const [loading, setLoading] = useState(true);
@@ -140,31 +141,39 @@ export default function RequestDetailsScreen() {
   const [expanded, setExpanded] = useState(false);
   const [accepting, setAccepting] = useState(false);
 
-  const loadedRequest = useRef<{ id: string; at: number } | null>(null);
+  const readVersion = useRef(0);
+  const locationKey = coordinates ? `${coordinates.latitude},${coordinates.longitude}` : 'none';
+  const loadedRequest = useRef<{ id: string; at: number; locationKey: string } | null>(null);
   const loadRequest = useCallback(async () => {
     if (!id) {
       setError('Không tìm thấy mã yêu cầu.');
       setLoading(false);
       return;
     }
+    const version = ++readVersion.current;
     const hasData = loadedRequest.current?.id === id;
     if (!hasData) { setLoading(true); setParticipantStatus(null); setRequest(null); }
     setError(null);
     setUnavailable(false);
     try {
-      setRequest(await getExploreRequest(id, BEN_NGHE_CENTER));
-      loadedRequest.current = { id, at: Date.now() };
+      const detail = await getExploreRequest(id, coordinates ?? undefined);
+      if (version !== readVersion.current) return;
+      setRequest(detail);
+      loadedRequest.current = { id, at: Date.now(), locationKey };
       setParticipantStatus(null);
     } catch (loadError) {
+      if (version !== readVersion.current) return;
       const message = loadError instanceof Error ? loadError.message : '';
       if (message === 'Request not found') {
         try {
-          const orderDetail = await getOrderDetail(id, BEN_NGHE_CENTER);
+          const orderDetail = await getOrderDetail(id, coordinates ?? undefined);
+          if (version !== readVersion.current) return;
           setRequest(orderDetail);
-          loadedRequest.current = { id, at: Date.now() };
+          loadedRequest.current = { id, at: Date.now(), locationKey };
           setParticipantStatus(orderDetail.status);
           return;
         } catch (orderError) {
+          if (version !== readVersion.current) return;
           const orderMessage = orderError instanceof Error ? orderError.message : '';
           if (orderMessage !== 'Order not found') {
             setError(orderMessage || 'Không thể tải yêu cầu lúc này.');
@@ -180,11 +189,14 @@ export default function RequestDetailsScreen() {
         ? 'Yêu cầu này vừa được người khác nhận và không còn trong danh sách Khám phá.'
         : message || 'Không thể tải yêu cầu lúc này.');
     } finally {
-      setLoading(false);
+      if (version === readVersion.current) setLoading(false);
     }
-  }, [id]);
+  }, [id, coordinates, locationKey]);
 
-  useFocusEffect(useCallback(() => { if (loadedRequest.current?.id !== id || Date.now() - loadedRequest.current.at >= 30_000) void loadRequest(); }, [loadRequest, id]));
+  useFocusEffect(useCallback(() => {
+    if (loadedRequest.current?.id !== id || loadedRequest.current.locationKey !== locationKey || Date.now() - loadedRequest.current.at >= 30_000) void loadRequest();
+    return () => { readVersion.current += 1; };
+  }, [loadRequest, id, locationKey]));
 
   const shoppingItems = useMemo(() => (request?.items ?? []).map((item, index): DisplayItem => ({
     ...item,

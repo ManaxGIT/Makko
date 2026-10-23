@@ -17,7 +17,9 @@ async def get_home_dashboard(
     user: Annotated[CurrentUser, Depends(get_current_user)],
     repository: Annotated[SupabaseRepository, Depends(get_repository)],
     nearby_limit: Annotated[int, Query(ge=1, le=10)] = 5,
+    latitude: Annotated[float | None, Query(ge=-90, le=90, allow_inf_nan=False)] = None,
+    longitude: Annotated[float | None, Query(ge=-180, le=180, allow_inf_nan=False)] = None,
 ) -> HomeDashboard:
     return await MarketplaceService(repository).get_home_dashboard(
-        user.id, nearby_limit=nearby_limit
+        user.id, nearby_limit=nearby_limit, latitude=latitude, longitude=longitude
     )

@@ -204,10 +204,13 @@ function OrderList({ history, userId }: { history: boolean; userId: string }) {
     setOrders(rows => rows.filter(order => order.id !== id));
   };
 
-  const activeOrders = useMemo(() => orders.filter(order => !completedStatuses.includes(order.status)), [orders]);
-  const posted = activeOrders.filter(order => order.role === 'customer');
-  const received = activeOrders.filter(order => order.role === 'shopper');
-  const visibleOrders = history ? orders.filter(order => completedStatuses.includes(order.status)) : activeTab === 'customer' ? posted : received;
+  const scopedOrders = useMemo(
+    () => orders.filter(order => completedStatuses.includes(order.status) === history),
+    [orders, history],
+  );
+  const posted = scopedOrders.filter(order => order.role === 'customer');
+  const received = scopedOrders.filter(order => order.role === 'shopper');
+  const visibleOrders = activeTab === 'customer' ? posted : received;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={history ? ['top', 'bottom'] : ['top']}>
@@ -219,7 +222,7 @@ function OrderList({ history, userId }: { history: boolean; userId: string }) {
 
       </View>
 
-      {!history && <View accessibilityRole="tablist" style={styles.tabs}>
+      <View accessibilityRole="tablist" style={styles.tabs}>
         <TabButton
           active={activeTab === 'customer'}
           count={posted.length}
@@ -232,7 +235,7 @@ function OrderList({ history, userId }: { history: boolean; userId: string }) {
           count={received.length}
           onPress={() => setActiveTab('shopper')}
         />
-      </View>}
+      </View>
 
       <ScrollView
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); void loadOrders(true); }} tintColor={colors.forest} />}
@@ -247,8 +250,8 @@ function OrderList({ history, userId }: { history: boolean; userId: string }) {
           </View>
         ) : visibleOrders.length ? visibleOrders.map((order) => <OrderCard key={order.id} order={order} onDeleted={onDeleted} onConflict={() => void loadOrders(true)} />) : (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyTitle}>{history ? 'Chưa có lịch sử đơn hàng' : activeTab === 'customer' ? 'Chưa có đơn đã đăng' : 'Chưa có đơn đã nhận'}</Text>
-            <Text style={styles.emptyDescription}>{history ? 'Đơn đã hoàn tất và đã hủy sẽ xuất hiện tại đây.' : activeTab === 'customer' ? 'Các yêu cầu bạn đăng sẽ xuất hiện tại đây.' : 'Các yêu cầu bạn nhận đi giúp sẽ xuất hiện tại đây.'}</Text>
+            <Text style={styles.emptyTitle}>{history ? (activeTab === 'customer' ? 'Chưa có lịch sử đơn đã đăng' : 'Chưa có lịch sử đơn đã nhận') : activeTab === 'customer' ? 'Chưa có đơn đã đăng' : 'Chưa có đơn đã nhận'}</Text>
+            <Text style={styles.emptyDescription}>{history ? (activeTab === 'customer' ? 'Các đơn bạn đăng đã hoàn tất hoặc đã hủy sẽ xuất hiện tại đây.' : 'Các đơn bạn nhận đi giúp đã hoàn tất hoặc đã hủy sẽ xuất hiện tại đây.') : activeTab === 'customer' ? 'Các yêu cầu bạn đăng sẽ xuất hiện tại đây.' : 'Các yêu cầu bạn nhận đi giúp sẽ xuất hiện tại đây.'}</Text>
           </View>
         )}
 

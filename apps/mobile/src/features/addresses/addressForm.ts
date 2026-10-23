@@ -4,6 +4,7 @@ export type OrderAddressSnapshot = Pick<SavedAddress, 'recipientPhone' | 'line1'
 
 export type DeliveryAddress = {
   orderAddress?: OrderAddressSnapshot | null;
+  coordinates?: { latitude: number; longitude: number } | null;
   phone: string;
   line1: string;
   province: Province | null;
@@ -13,6 +14,7 @@ export type DeliveryAddress = {
 
 export function fromSavedAddress(saved: SavedAddress): DeliveryAddress {
   return {
+    coordinates: saved.latitude !== null && saved.longitude !== null ? { latitude: saved.latitude, longitude: saved.longitude } : null,
     phone: saved.recipientPhone,
     line1: saved.line1,
     province: saved.provinceCode ? { code: saved.provinceCode, name: saved.city, fullName: saved.city } : null,

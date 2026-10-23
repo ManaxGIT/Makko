@@ -18,11 +18,11 @@ export type HomeDashboard = {
 };
 
 export async function getHomeDashboard({
-  nearbyLimit = 5,
+  nearbyLimit = 5, latitude, longitude,
 }: {
-  nearbyLimit?: number;
+  nearbyLimit?: number; latitude?: number; longitude?: number;
 } = {}): Promise<HomeDashboard> {
   return apiGet<HomeDashboard>('/api/v1/home', {
-    nearby_limit: nearbyLimit,
+    nearby_limit: nearbyLimit, latitude, longitude,
   });
 }

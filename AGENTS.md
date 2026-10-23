@@ -124,6 +124,14 @@ and the corresponding Supabase provider/configuration have been verified.
   Coordinate-dependent features are deferred; do not block posting on geolocation
   or fabricate distances. Preserve atomic creation/publication and owner checks.
 
+## Maps and distance
+
+- User decision (2026-10-23): Google Maps integration is temporarily paused.
+  Do not load the map picker or enable its config plugin until the user resumes it.
+  Keep manual address entry and optional current-device GPS coordinates.
+  Reverse geocoding is deferred; do not use Google Geocoding to convert coordinates
+  to address text. Users enter address text manually, independently of the map pin.
+
 ## Figma implementation
 
 - Use a design-first workflow for new UI requests. When the user asks to

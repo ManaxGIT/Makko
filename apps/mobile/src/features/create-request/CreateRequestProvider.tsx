@@ -4,6 +4,7 @@ import { getPreferredAddress, saveAddress, SavedAddress } from '@/features/addre
 import { getHomeDashboard } from '@/features/home/api';
 import { ApiError } from '@/lib/api';
 import { buildRequestBody, createAndPublishRequest, CreateRequestBody, EditRequestBody, getEditableRequest, updateRequest } from './api';
+import type { MealSuggestion } from '@/features/meals/api';
 import type { OrderActionResult } from '@/features/orders/api';
 import { useAuth } from '@/features/auth/AuthProvider';
 
@@ -21,6 +22,7 @@ type FormContext = {
   reloadEdit: () => void;
   patch: (value: Partial<RequestForm>) => void;
   reset: () => void;
+  startFromMeal: (meal: MealSuggestion) => void;
   addressLoading: boolean;
   addressError: string;
   savingAddress: boolean;
@@ -123,7 +125,7 @@ function AccountRequestProvider({ children, userId, editId }: PropsWithChildren<
       const saved = await saveAddress({
         label: 'Nhà', recipientName: profile.displayName.trim(), recipientPhone: address.phone.trim(),
         line1: address.line1.trim(), provinceCode: address.province.code, wardCode: address.ward.code,
-        latitude: null, longitude: null, isDefault: true,
+        latitude: address.coordinates?.latitude ?? null, longitude: address.coordinates?.longitude ?? null, isDefault: true,
       }, userId);
       if (!alive.current) return;
       setPreferred(saved);
@@ -181,6 +183,16 @@ function AccountRequestProvider({ children, userId, editId }: PropsWithChildren<
       pendingSubmission.current = null;
       setPublishedRequest(null); setRequestLocked(false);
       setForm({ ...initialForm(), ...(preferred ? fromSavedAddress(preferred) : {}) });
+    },
+    startFromMeal: meal => {
+      if (!alive.current || !userId) throw new Error('Tài khoản đã thay đổi. Vui lòng thử lại.');
+      if (editId || savingAddress || publishLock.current || (pendingSubmission.current && !publishedRequest)) throw new Error('Vui lòng xử lý yêu cầu đang đăng trước khi chọn bữa mới.');
+      pendingSubmission.current = null;
+      setPublishedRequest(null); setRequestLocked(false);
+      setForm(current => ({ ...current,
+        title: meal.title, budget: String(meal.suggestedGoodsAmount),
+        items: meal.ingredients.map((i, index) => ({ id: `meal-${Date.now()}-${index}`, name: i.name, quantity: String(i.quantity), unit: i.unit, note: '', allowSubstitution: false })),
+      }));
     },
     addressLoading, addressError, savingAddress, publishing, requestLocked, publishedRequest, publishRequest,
     reloadAddress: () => setAttempt(n => n + 1), saveDeliveryAddress,

@@ -1,27 +1,24 @@
 import type { ComponentProps } from 'react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { ExploreRequest } from '@/features/explore/api';
+import { MealPlate } from '@/features/meals/MealPlate';
 import { getHomeDashboard, HomeDashboard } from '@/features/home/api';
+import { useCurrentLocation } from '@/features/location/LocationProvider';
 import { colors } from '@/theme/colors';
-import { fontFamilies, fontSizes } from '@/theme/typography';
+import { fontFamilies, fontSizes, letterSpacing, lineHeights } from '@/theme/typography';
 
 type SymbolName = ComponentProps<typeof SymbolView>['name'];
-
-const filters = ['Tất cả', 'Rau củ', 'Thịt cá', 'Đồ khô'];
-const normalize = (value: string) => value.toLocaleLowerCase('vi');
 
 function initials(name: string) {
   return name.split(/\s+/).filter(Boolean).slice(-2).map((part) => part[0]).join('').toLocaleUpperCase('vi');
@@ -42,14 +39,6 @@ function deadline(value: string | null) {
 function distance(value: number | null) {
   if (value === null) return 'Chưa rõ';
   return value < 1000 ? `${Math.round(value / 10) * 10}m` : `${(value / 1000).toLocaleString('vi-VN', { maximumFractionDigits: 1 })}km`;
-}
-
-function isInFilter(request: ExploreRequest, filter: string) {
-  if (filter === 'Tất cả') return true;
-  const value = normalize(request.items.map((item) => item.name).join(' '));
-  if (filter === 'Rau củ') return ['rau', 'củ', 'cải', 'khoai'].some((word) => value.includes(word));
-  if (filter === 'Thịt cá') return ['thịt', 'cá', 'tôm', 'gà', 'bò', 'heo'].some((word) => value.includes(word));
-  return ['gạo', 'đậu', 'mì', 'bún', 'khô'].some((word) => value.includes(word));
 }
 
 function AppIcon({ name, color = colors.forest, size = 20 }: {
@@ -97,41 +86,41 @@ function ActionCard({
       <View style={[styles.actionIcon, { backgroundColor: iconBackground }]}>
         <AppIcon name={icon} color={textColor} size={20} />
       </View>
-      <Text style={[styles.actionTitle, { color: textColor }]}>{title}</Text>
-      <Text style={[styles.actionSubtitle, { color: textColor }]}>{subtitle}</Text>
+      <View style={styles.actionCopy}><Text style={[styles.actionTitle, { color: textColor }]}>{title}</Text>
+      <Text style={[styles.actionSubtitle, { color: textColor }]}>{subtitle}</Text></View>
     </Pressable>
   );
 }
 
 export default function HomeScreen() {
   const router = useRouter();
-  const [activeFilter, setActiveFilter] = useState(filters[0]);
-  const [query, setQuery] = useState('');
+  const { coordinates, locate, locating, error: locationError } = useCurrentLocation();
+  const loaded = useRef(false);
+  const requestVersion = useRef(0);
   const [dashboard, setDashboard] = useState<HomeDashboard | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const loadDashboard = useCallback(async () => {
-    setLoading(true);
+    const version = ++requestVersion.current;
+    if (!loaded.current) setLoading(true);
     setError(null);
     try {
-      setDashboard(await getHomeDashboard({ nearbyLimit: 5 }));
+      const result = await getHomeDashboard({ nearbyLimit: 5, ...(coordinates ?? {}) });
+      if (version !== requestVersion.current) return;
+      loaded.current = true;
+      setDashboard(result);
     } catch (loadError) {
+      if (version !== requestVersion.current) return;
       setError(loadError instanceof Error ? loadError.message : 'Không thể tải trang chủ lúc này.');
     } finally {
-      setLoading(false);
+      if (version === requestVersion.current) setLoading(false);
     }
-  }, []);
+  }, [coordinates]);
 
-  useEffect(() => { void loadDashboard(); }, [loadDashboard]);
+  useEffect(() => { void loadDashboard(); return () => { requestVersion.current += 1; }; }, [loadDashboard]);
 
-  const nearbyRequest = useMemo(() => {
-    const needle = normalize(query.trim());
-    return dashboard?.nearbyRequests.find((request) =>
-      isInFilter(request, activeFilter)
-      && (!needle || normalize([request.title, request.ownerDisplayName, ...request.items.map((item) => item.name)].join(' ')).includes(needle)),
-    );
-  }, [activeFilter, dashboard, query]);
+  const nearbyRequest = dashboard?.nearbyRequests[0];
 
   const displayName = dashboard?.profile.displayName ?? 'bạn';
   const locationName = dashboard?.location?.ward ?? dashboard?.location?.district ?? 'Chọn khu vực';
@@ -167,57 +156,37 @@ export default function HomeScreen() {
 
         <View style={styles.hero}>
           <Text style={styles.greeting}>Xin chào, {firstName(displayName)}</Text>
-          <Text style={styles.heading}>Hôm nay bạn cần{`\n`}mua gì ở chợ?</Text>
+          <Text style={styles.heading}>Chuyện đi chợ,{`\n`}để Makko lo.</Text>
         </View>
 
-        <View style={styles.searchBox}>
-          <AppIcon
-            name={{ ios: 'magnifyingglass', android: 'search', web: 'search' }}
-            size={20}
-          />
-          <TextInput
-            accessibilityLabel="Tìm mặt hàng"
-            onChangeText={setQuery}
-            placeholder="Tìm rau, thịt, đồ khô..."
-            placeholderTextColor={colors.mutedLight}
-            style={styles.searchInput}
-            value={query}
-          />
-          <Pressable
-            accessibilityLabel="Bộ lọc tìm kiếm"
-            style={({ pressed }) => [styles.filterButton, pressed && styles.pressed]}
-          >
-            <AppIcon
-              name={{ ios: 'slider.horizontal.3', android: 'tune', web: 'tune' }}
-              color={colors.coral}
-              size={16}
-            />
-          </Pressable>
+        <View style={styles.mealHero}>
+          <View style={styles.mealCopy}><Text style={styles.mealEyebrow}>TRỢ LÝ BỮA ĂN ✧</Text><Text style={styles.mealHeading}>Hôm nay{`\n`}ăn gì?</Text><Text style={styles.mealDescription}>Một chút cảm hứng.{`\n`}Một bữa ngon đúng ý.</Text><Pressable accessibilityRole="button" onPress={() => router.push('/today-meal')} style={({ pressed }) => [styles.mealButton, pressed && styles.pressed]}><Text style={styles.mealButtonText}>Gợi ý cho mình →</Text></Pressable></View>
+          <View pointerEvents="none" style={styles.mealArt}><MealPlate /></View>
         </View>
 
         <View style={styles.actions}>
           <ActionCard
-            backgroundColor={colors.forest}
+            backgroundColor={colors.surface}
             icon={{ ios: 'plus', android: 'add', web: 'add' }}
-            iconBackground="rgba(255,255,255,0.15)"
+            iconBackground={colors.cream}
             onPress={() => router.push('/create/items')}
-            subtitle="Nhờ người gần bạn"
-            textColor={colors.surface}
+            subtitle="Đã biết cần mua gì?"
+            textColor={colors.forest}
             title="Tạo yêu cầu"
           />
           <ActionCard
-            backgroundColor={colors.orange}
+            backgroundColor={colors.surface}
             icon={{ ios: 'arrow.up.right', android: 'north_east', web: 'north_east' }}
-            iconBackground="rgba(255,255,255,0.3)"
+            iconBackground={colors.cream}
             onPress={() => router.push('/(tabs)/explore')}
-            subtitle="Kiếm thêm thu nhập"
+            subtitle="Nhận việc gần bạn"
             textColor={colors.forest}
             title="Đi chợ giúp"
           />
         </View>
 
         <View style={styles.nearbyHeader}>
-          <Text style={styles.sectionTitle}>Gần bạn</Text>
+          <Text style={styles.sectionTitle}>Yêu cầu gần bạn</Text>
           <Pressable
             accessibilityRole="button"
             onPress={() => router.push('/(tabs)/explore')}
@@ -226,35 +195,13 @@ export default function HomeScreen() {
           </Pressable>
         </View>
 
-        <ScrollView
-          contentContainerStyle={styles.filters}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-        >
-          {filters.map((filter) => {
-            const selected = filter === activeFilter;
-
-            return (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityState={{ selected }}
-                key={filter}
-                onPress={() => setActiveFilter(filter)}
-                style={({ pressed }) => [
-                  styles.filterChip,
-                  selected && styles.activeFilterChip,
-                  pressed && styles.pressed,
-                ]}
-              >
-                <Text style={[styles.filterLabel, selected && styles.activeFilterLabel]}>
-                  {filter}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-
-        {loading ? <View style={styles.statusCard}><ActivityIndicator color={colors.coral} /><Text style={styles.statusText}>Đang tải yêu cầu gần bạn...</Text></View> : error ? (
+        <Pressable accessibilityRole="button" disabled={locating} onPress={() => void locate()} style={styles.statusCard}>
+          <Text style={styles.statusText}>{locating ? 'Đang lấy vị trí…' : coordinates ? 'Vị trí hiện tại · trong 3km · Chạm để cập nhật' : 'Bật vị trí để tìm đơn gần bạn'}</Text>
+        </Pressable>
+        {!!locationError && <Text accessibilityRole="alert" style={styles.statusText}>{locationError}</Text>}
+        {error && dashboard && <Pressable onPress={() => void loadDashboard()}><Text style={styles.statusText}>{error} · Thử lại</Text></Pressable>}
+        {coordinates && <Text style={styles.statusText}>Khoảng cách ước tính theo đường chim bay</Text>}
+        {loading ? <View style={styles.statusCard}><ActivityIndicator color={colors.coral} /><Text style={styles.statusText}>Đang tải yêu cầu gần bạn...</Text></View> : error && !dashboard ? (
           <View style={styles.statusCard}>
             <Text style={styles.statusTitle}>Không thể tải trang chủ</Text>
             <Text style={styles.statusText}>{error}</Text>
@@ -294,13 +241,21 @@ export default function HomeScreen() {
               <Text style={styles.acceptLabel}>Nhận đơn</Text>
             </Pressable>
           </View>
-        </View> : <View style={styles.statusCard}><Text style={styles.statusTitle}>Chưa có yêu cầu phù hợp</Text><Text style={styles.statusText}>Thử đổi từ khóa hoặc danh mục nhé.</Text></View>}
+        </View> : <View style={styles.statusCard}><Text style={styles.statusTitle}>Chưa có yêu cầu phù hợp</Text><Text style={styles.statusText}>Bạn có thể tìm thêm yêu cầu trong Khám phá.</Text></View>}
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  mealHero: { marginHorizontal: 20, borderRadius: 23, backgroundColor: colors.orange, padding: 20, minHeight: 220, overflow: 'hidden' },
+  mealCopy: { zIndex: 1, alignItems: 'flex-start', width: '60%' },
+  mealEyebrow: { fontFamily: fontFamilies.bodyExtraBold, fontSize: fontSizes.caption, letterSpacing: letterSpacing.eyebrow, color: colors.forest },
+  mealHeading: { fontFamily: fontFamilies.display, fontSize: fontSizes.pageTitle, lineHeight: lineHeights.pageTitle, color: colors.forest, marginTop: 10 },
+  mealDescription: { fontFamily: fontFamilies.body, fontSize: fontSizes.bodySmall, lineHeight: lineHeights.bodySmall, color: colors.forest, marginTop: 7 },
+  mealButton: { backgroundColor: colors.cream, borderRadius: 11, padding: 11, marginTop: 16 },
+  mealButtonText: { fontFamily: fontFamilies.bodyBold, fontSize: fontSizes.bodySmall, color: colors.forest },
+  mealArt: { position: 'absolute', right: -32, top: 34 },
   safeArea: { backgroundColor: colors.background, flex: 1 },
   content: { paddingBottom: 24 },
   header: {
@@ -315,7 +270,7 @@ const styles = StyleSheet.create({
     color: colors.coral,
     fontFamily: fontFamilies.bodyExtraBold,
     fontSize: fontSizes.body,
-    letterSpacing: 1.76,
+    letterSpacing: letterSpacing.eyebrow,
   },
   locationButton: { alignItems: 'center', flexDirection: 'row', marginTop: 2 },
   location: { color: colors.text, fontFamily: fontFamilies.bodyBold, fontSize: fontSizes.body },
@@ -344,40 +299,13 @@ const styles = StyleSheet.create({
   heading: {
     color: colors.text,
     fontFamily: fontFamilies.display,
-    fontSize: fontSizes.display,
-    lineHeight: 35.64,
+    fontSize: fontSizes.pageTitle,
+    lineHeight: lineHeights.pageTitle,
     marginTop: 5,
   },
-  searchBox: {
-    alignItems: 'center',
-    alignSelf: 'center',
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: 15,
-    borderWidth: 1,
-    flexDirection: 'row',
-    height: 48,
-    paddingHorizontal: 15,
-    width: '83%',
-  },
-  searchInput: {
-    color: colors.text,
-    flex: 1,
-    fontFamily: fontFamilies.body,
-    fontSize: fontSizes.body,
-    marginLeft: 10,
-    paddingVertical: 0,
-  },
-  filterButton: {
-    alignItems: 'center',
-    backgroundColor: colors.cream,
-    borderRadius: 9,
-    height: 30,
-    justifyContent: 'center',
-    width: 30,
-  },
   actions: { flexDirection: 'row', gap: 10, paddingHorizontal: 20, paddingTop: 15 },
-  actionCard: { borderRadius: 18, flex: 1, minHeight: 103, padding: 15 },
+  actionCard: { borderRadius: 15, borderWidth: 1, borderColor: colors.border, flex: 1, minHeight: 76, padding: 11, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  actionCopy: { flex: 1 },
   actionIcon: {
     alignItems: 'center',
     borderRadius: 9,
@@ -385,11 +313,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 30,
   },
-  actionTitle: { fontFamily: fontFamilies.bodyBold, fontSize: fontSizes.body, marginTop: 8 },
+  actionTitle: { fontFamily: fontFamilies.bodyBold, fontSize: fontSizes.bodySmall, lineHeight: lineHeights.bodySmall },
   actionSubtitle: {
     fontFamily: fontFamilies.body,
-    fontSize: fontSizes.bodySmall,
-    marginTop: 4,
+    fontSize: fontSizes.caption,
+    lineHeight: lineHeights.caption,
+    marginTop: 3,
     opacity: 0.7,
   },
   nearbyHeader: {
@@ -402,28 +331,16 @@ const styles = StyleSheet.create({
   },
   sectionTitle: { color: colors.text, fontFamily: fontFamilies.bodyBold, fontSize: fontSizes.bodyLarge },
   seeAll: { color: colors.coral, fontFamily: fontFamilies.bodyBold, fontSize: fontSizes.bodySmall },
-  filters: { gap: 7, paddingBottom: 13, paddingHorizontal: 20 },
-  filterChip: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: 99,
-    borderWidth: 1,
-    justifyContent: 'center',
-    paddingHorizontal: 13,
-    paddingVertical: 8,
-  },
-  activeFilterChip: { backgroundColor: colors.forest, borderColor: colors.forest },
-  filterLabel: { color: '#000000', fontFamily: fontFamilies.body, fontSize: fontSizes.bodySmall },
-  activeFilterLabel: { color: colors.surface },
   requestCard: {
     alignSelf: 'center',
+    maxWidth: '90%',
     backgroundColor: colors.surface,
     borderColor: colors.border,
     borderRadius: 20,
     borderWidth: 1,
     gap: 8,
     padding: 15,
-    width: '83%',
+    width: '100%',
   },
   requestOwnerRow: { alignItems: 'center', flexDirection: 'row' },
   requestAvatar: {
@@ -486,7 +403,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   acceptLabel: { color: colors.forest, fontFamily: fontFamilies.body, fontSize: fontSizes.body },
-  statusCard: { alignItems: 'center', alignSelf: 'center', backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 20, borderWidth: 1, gap: 7, padding: 22, width: '83%' },
+  statusCard: { maxWidth: '90%', alignItems: 'center', alignSelf: 'center', backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 20, borderWidth: 1, gap: 7, padding: 22, width: '100%' },
   statusTitle: { color: colors.text, fontFamily: fontFamilies.bodyBold, fontSize: fontSizes.body },
   statusText: { color: colors.muted, fontFamily: fontFamilies.body, fontSize: fontSizes.bodySmall, textAlign: 'center' },
   retryButton: { backgroundColor: colors.orange, borderRadius: 10, marginTop: 5, paddingHorizontal: 16, paddingVertical: 9 },

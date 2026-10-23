@@ -13,6 +13,8 @@ import {
 
 import { CreateRequestProvider } from '@/features/create-request/CreateRequestProvider';
 
+import { LocationProvider } from '@/features/location/LocationProvider';
+
 import { AuthProvider } from '@/features/auth/AuthProvider';
 
 export default function RootLayout() {
@@ -29,10 +31,12 @@ export default function RootLayout() {
 
   return (
     <AuthProvider>
-      <CreateRequestProvider>
-        <StatusBar style="dark" />
-        <Stack screenOptions={{ headerShown: false }} />
-      </CreateRequestProvider>
+      <LocationProvider>
+        <CreateRequestProvider>
+          <StatusBar style="dark" />
+          <Stack screenOptions={{ headerShown: false }} />
+        </CreateRequestProvider>
+      </LocationProvider>
     </AuthProvider>
   );
 }
