@@ -14,7 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { MealPlate } from '@/features/meals/MealPlate';
 import { getHomeDashboard, HomeDashboard } from '@/features/home/api';
-import { useCurrentLocation } from '@/features/location/LocationProvider';
+import { useNearbyLocation } from '@/features/location/LocationProvider';
 import { colors } from '@/theme/colors';
 import { fontFamilies, fontSizes, letterSpacing, lineHeights } from '@/theme/typography';
 
@@ -94,7 +94,7 @@ function ActionCard({
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { coordinates, locate, locating, error: locationError } = useCurrentLocation();
+  const { coordinates, locate, locating, error: locationError } = useNearbyLocation();
   const loaded = useRef(false);
   const requestVersion = useRef(0);
   const [dashboard, setDashboard] = useState<HomeDashboard | null>(null);

@@ -20,6 +20,7 @@ function provider({ native = false, platform = 'ios', permission = { granted: tr
       useEffect: effect => effect(), useRef: current => ({ current }),
       useState: initial => [initial, value => updates.push(value)],
     };
+    if (name === 'expo-router') return { useFocusEffect: () => {} };
     if (name === 'react/jsx-runtime') return { jsx: (type, props) => ({ type, props }) };
     if (name === 'expo') return { requireOptionalNativeModule: () => native ? {} : null };
     if (name === 'react-native') return { Platform: { OS: platform }, Alert: { alert: (...args) => alerts.push(args) }, Linking: { openSettings: async () => { settingsOpened++; } } };
@@ -102,4 +103,30 @@ test('a retryable denial and disabled location services do not read GPS', async 
   assert.equal(await off.state.locate(), null);
   assert.equal(off.positions(), 0);
   assert.equal(off.requests(), 0);
+});
+
+
+test('automatic location reads granted GPS without showing a permission prompt', async () => {
+  const p = provider({ native: true });
+  const point = await p.state.locate({ automatic: true });
+  assert.equal(point.latitude, 10.77);
+  assert.equal(p.requests(), 0);
+  assert.equal(p.alerts.length, 0);
+  await p.state.locate({ automatic: true });
+  assert.equal(p.positions(), 1);
+  await p.state.locate();
+  assert.equal(p.positions(), 2);
+});
+
+test('automatic location never requests missing or denied permissions', async () => {
+  for (const canAskAgain of [true, false]) {
+    const p = provider({ native: true, permission: { granted: false, canAskAgain } });
+    assert.equal(await p.state.locate({ automatic: true }), null);
+    assert.equal(p.requests(), 0);
+    assert.equal(p.positions(), 0);
+    assert.equal(p.alerts.length, 0);
+  }
+  const old = provider();
+  assert.equal(await old.state.locate({ automatic: true }), null);
+  assert.equal(old.imports(), 0);
 });
