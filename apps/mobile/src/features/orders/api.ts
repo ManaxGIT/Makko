@@ -7,6 +7,7 @@ export type OrderStatus =
   | 'delivering' | 'delivered' | 'completed' | 'cancelled' | 'disputed';
 
 export type OrderSummary = {
+  hasRecipe: boolean;
   id: string;
   role: 'customer' | 'shopper';
   title: string;
@@ -34,6 +35,7 @@ export type OrderSummary = {
 export type OrderActionResult = { requestId: string; status: OrderStatus };
 
 export type OrderTracking = {
+  hasRecipe: boolean;
   id: string;
   role: 'customer' | 'shopper';
   status: OrderStatus;

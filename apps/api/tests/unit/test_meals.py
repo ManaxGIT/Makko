@@ -17,7 +17,11 @@ def settings(key='test-key'):
 
 
 def suggestion(**changes):
-    return dict(title='Trứng sốt cà chua', description='Bữa ăn hai người.', cookingMinutes=20, suggestedGoodsAmount=45000, ingredients=[dict(name='Trứng gà', quantity=4, unit='quả')]) | changes
+    return dict(title='Trứng sốt cà chua', description='Bữa ăn hai người.', cookingMinutes=20, suggestedGoodsAmount=45000, ingredients=[dict(name='Trứng gà', quantity=4, unit='quả', note='Mua trứng nguyên quả')], recipe=dict(title='Trứng sốt cà chua', cookingMinutes=20, servings=2, ingredients=[dict(name='Trứng gà', quantity=4, unit='quả')], steps=['Sơ chế và nấu trứng đến khi chín đều.'])) | changes
+
+
+def three_suggestions(**first_changes):
+    return [suggestion(**first_changes), suggestion(title='Đậu phụ kho nấm'), suggestion(title='Shakshuka')]
 
 
 def response_body(result, finish='STOP'):
@@ -39,15 +43,16 @@ async def test_generation_context_and_credentials():
         assert schema['type'] == 'OBJECT'
         assert schema['properties']['suggestions']['items']['properties']['ingredients']['items']['properties']['quantity']['type'] == 'NUMBER'
         assert '$ref' not in json.dumps(schema)
-        return httpx.Response(200, json=response_body({'suggestions': [suggestion()]}))
+        return httpx.Response(200, json=response_body({'suggestions': three_suggestions()}))
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
         result = await MealService(settings(), client).suggest(prefs)
+    assert len(result.suggestions) == 3
     assert result.suggestions[0].ingredients[0].quantity == 4
     assert result.model_dump(by_alias=True)['suggestions'][0]['suggestedGoodsAmount'] == 45000
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize('payload', [{}, {'candidates': []}, response_body({}, 'MAX_TOKENS'), response_body({'suggestions': []}), response_body({'suggestions': [suggestion(suggestedGoodsAmount=100001)]}), response_body({'suggestions': [suggestion(ingredients=[dict(name='Gạo', quantity=-1, unit='kg')])]} )])
+@pytest.mark.parametrize('payload', [{}, {'candidates': []}, response_body({}, 'MAX_TOKENS'), response_body({'suggestions': []}), response_body({'suggestions': three_suggestions(suggestedGoodsAmount=100001)}), response_body({'suggestions': three_suggestions(ingredients=[dict(name='Gạo', quantity=-1, unit='kg')])} )])
 async def test_rejects_bad_or_over_budget_results(payload):
     async with httpx.AsyncClient(transport=httpx.MockTransport(lambda _: httpx.Response(200, json=payload))) as client:
         with pytest.raises(HTTPException) as error:
@@ -84,7 +89,7 @@ def test_input_limits_and_result_precision():
             MealPreferences.model_validate(prefs.model_dump() | changes)
     for ingredients in ([dict(name='Gạo', quantity=.0001, unit='kg')], [dict(name='Gạo', quantity=1, unit='kg'), dict(name='gạo', quantity=2, unit='kg')]):
         with pytest.raises(ValidationError):
-            MealSuggestions.model_validate({'suggestions': [suggestion(ingredients=ingredients)]})
+            MealSuggestions.model_validate({'suggestions': three_suggestions(ingredients=ingredients)})
 
 
 @pytest.mark.asyncio
@@ -97,7 +102,7 @@ async def test_endpoint_authentication_and_response_contract():
         assert response.status_code == 401
         app.dependency_overrides[get_current_user] = lambda: CurrentUser(id=UUID('00000000-0000-0000-0000-000000000001'), access_token='test')
         try:
-            result = MealSuggestions.model_validate({'suggestions': [suggestion()]})
+            result = MealSuggestions.model_validate({'suggestions': three_suggestions()})
             with patch.object(MealService, 'suggest', new=AsyncMock(return_value=result)):
                 response = await client.post('/api/v1/meals/suggestions', json=prefs.model_dump(by_alias=True))
             assert response.status_code == 200
@@ -109,3 +114,17 @@ async def test_endpoint_authentication_and_response_contract():
 def test_style_is_optional_for_existing_clients():
     original = prefs.model_dump(exclude={'style'})
     assert MealPreferences.model_validate(original).style == ''
+
+
+@pytest.mark.parametrize('choices', [three_suggestions()[:2], three_suggestions() + [suggestion(title='Món thứ tư')], [suggestion(), suggestion(), suggestion()]])
+def test_requires_three_distinct_suggestions(choices):
+    with pytest.raises(ValidationError):
+        MealSuggestions.model_validate({'suggestions': choices})
+
+
+@pytest.mark.parametrize('recipe_change', [{'steps': []}, {'steps': [' ']}, {'servings': 0}, {'cookingMinutes': 0}])
+def test_invalid_cooking_instructions_rejected(recipe_change):
+    value = suggestion()
+    value['recipe'].update(recipe_change)
+    with pytest.raises(ValidationError):
+        MealSuggestions.model_validate({'suggestions': [value, suggestion(title='Món hai'), suggestion(title='Món ba')]})

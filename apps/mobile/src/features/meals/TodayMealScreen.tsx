@@ -6,6 +6,7 @@ import { SymbolView } from 'expo-symbols';
 import { useCreateRequest } from '@/features/create-request/CreateRequestProvider';
 import { colors } from '@/theme/colors';
 import { fontFamilies, fontSizes, letterSpacing, lineHeights } from '@/theme/typography';
+import { useRecipePreview } from './RecipePreviewProvider';
 import { MealPlate } from './MealPlate';
 import { MealPreferences, MealSuggestion, suggestMeals } from './api';
 
@@ -16,6 +17,7 @@ const money = (n: number) => `${n.toLocaleString('vi-VN')}đ`;
 export function TodayMealScreen({ userId }: { userId: string }) {
   const router = useRouter();
   const { form, startFromMeal, requestLocked, publishedRequest } = useCreateRequest();
+  const { setRecipe: setPreviewRecipe } = useRecipePreview();
   const [stage, setStage] = useState<'preferences' | 'suggestions'>('preferences');
   const [meal, setMeal] = useState('Bữa tối');
   const [customMeal, setCustomMeal] = useState('');
@@ -56,7 +58,7 @@ export function TodayMealScreen({ userId }: { userId: string }) {
       try { startFromMeal(suggestion); router.push('/create/items'); }
       catch (e) { setError(e instanceof Error ? e.message : 'Không chuyển được nguyên liệu.'); }
     };
-    if (form.items.length && !publishedRequest) Alert.alert('Thay danh sách đang soạn?', 'Nguyên liệu của bữa đã chọn sẽ thay danh sách và tiền hàng đang soạn. Địa chỉ nhận vẫn được giữ.', [{ text: 'Giữ danh sách', style: 'cancel' }, { text: 'Dùng bữa đã chọn', onPress: apply }]);
+    if (form.items.length && !form.recipe && !publishedRequest) Alert.alert('Thay danh sách đang soạn?', 'Nguyên liệu của bữa đã chọn sẽ thay danh sách và tiền hàng đang soạn. Địa chỉ nhận vẫn được giữ.', [{ text: 'Giữ danh sách', style: 'cancel' }, { text: 'Dùng bữa đã chọn', onPress: apply }]);
     else apply();
   }
   return <SafeAreaView style={s.safe} edges={['top', 'bottom']}><KeyboardAvoidingView style={s.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -74,7 +76,7 @@ export function TodayMealScreen({ userId }: { userId: string }) {
         <View style={s.field}><Text style={s.label}>Trong bếp đã có gì?</Text><TextInput accessibilityLabel="Trong bếp đã có gì?" value={pantry} onChangeText={setPantry} maxLength={1000} multiline placeholder="Ví dụ: gạo, dầu ăn, gia vị cơ bản…" placeholderTextColor={colors.mutedLight} style={[s.input, s.multiline]} /></View>
       </> : <>
         <Text style={s.eyebrow}>✧ GỢI Ý CHO BẠN</Text><Text style={s.heading}>Một vài gợi ý{`\n`}cho bữa hôm nay.</Text><Text style={s.lead}>{submitted?.meal} · {submitted?.people} người · Trong {money(submitted?.budget ?? 0)}</Text>
-        {suggestions.map((item, index) => <View key={`${index}-${item.title}`} style={[s.meal, selected === index && s.selectedMeal]}><View style={[s.visual, index % 2 === 1 && s.alternateVisual]}><MealPlate /></View><View style={s.mealBody}><Text style={s.mealTitle}>{item.title}</Text><Text style={s.description}>{item.description}</Text><View style={s.mealBottom}><View style={s.flex}><Text style={s.small}>{item.cookingMinutes} phút</Text><Text style={s.bold}>~ {money(item.suggestedGoodsAmount)}</Text></View><Pressable accessibilityRole="radio" accessibilityLabel={`Chọn ${item.title}`} accessibilityState={{ selected: selected === index }} onPress={() => setSelected(index)} style={[s.selectButton, selected === index && s.selectedChoice]}><Text style={s.bold}>{selected === index ? '✓ Đã chọn' : 'Chọn bữa này'}</Text></Pressable></View></View></View>)}
+        {suggestions.map((item, index) => <View key={`${index}-${item.title}`} style={[s.meal, selected === index && s.selectedMeal]}><View style={[s.visual, index % 2 === 1 && s.alternateVisual]}><MealPlate /></View><View style={s.mealBody}>{index === 2 && <Text style={s.discoveryLabel}>✧ THỬ ĐIỀU MỚI</Text>}<Text style={s.mealTitle}>{item.title}</Text><Text style={s.description}>{item.description}</Text><Pressable accessibilityRole="button" onPress={() => { setPreviewRecipe(item.recipe); router.push('/today-meal/recipe'); }} style={s.textButton}><Text style={s.link}>Xem cách nấu →</Text></Pressable><View style={s.mealBottom}><View style={s.flex}><Text style={s.small}>{item.cookingMinutes} phút</Text><Text style={s.bold}>~ {money(item.suggestedGoodsAmount)}</Text></View><Pressable accessibilityRole="radio" accessibilityLabel={`Chọn ${item.title}`} accessibilityState={{ selected: selected === index }} onPress={() => setSelected(index)} style={[s.selectButton, selected === index && s.selectedChoice]}><Text style={s.bold}>{selected === index ? '✓ Đã chọn' : 'Chọn bữa này'}</Text></Pressable></View></View></View>)}
         {!!submitted?.style && <Text style={s.hint}>Phong cách: {submitted.style}</Text>}
         <View style={s.inlineActions}><Pressable accessibilityRole="button" disabled={busy} onPress={() => void generate()} style={s.textButton}><Text style={s.link}>↻ Gợi ý khác</Text></Pressable><Pressable accessibilityRole="button" onPress={() => setStage('preferences')} style={s.textButton}><Text style={s.link}>Sửa nhu cầu</Text></Pressable></View>
         <View style={s.notice}><Text style={s.small}>Giá chỉ là ước lượng tham khảo. Bạn có thể kiểm tra, thêm bớt nguyên liệu và quyết định tiền hàng trong luồng Tạo yêu cầu.</Text></View>
@@ -105,5 +107,6 @@ const s = StyleSheet.create({
   choices: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 }, choice: { borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, borderRadius: 30, paddingHorizontal: 15, paddingVertical: 12 }, selectedChoice: { borderColor: colors.orange, backgroundColor: colors.cream },
   peopleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 22 }, stepper: { flexDirection: 'row', alignItems: 'center', gap: 16 }, countButton: { width: 36, height: 36, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 10, alignItems: 'center', justifyContent: 'center' }, countSymbol: { fontFamily: fontFamilies.bodyBold, fontSize: fontSizes.sectionTitle, color: colors.forest },
   footer: { borderTopWidth: 1, borderColor: colors.border, paddingHorizontal: 20, paddingTop: 14, paddingBottom: 10 }, primary: { borderRadius: 13, backgroundColor: colors.orange, alignItems: 'center', padding: 15, minHeight: 50 }, primaryLabel: { fontFamily: fontFamilies.bodyBold, fontSize: fontSizes.action, color: colors.forest }, disabled: { opacity: 0.6 },
+  discoveryLabel: { fontFamily: fontFamilies.bodyExtraBold, fontSize: fontSizes.caption, lineHeight: lineHeights.caption, letterSpacing: letterSpacing.eyebrow, color: colors.coral, marginBottom: 8 },
   meal: { borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, borderRadius: 18, overflow: 'hidden', marginBottom: 14 }, selectedMeal: { borderColor: colors.orange }, visual: { height: 130, backgroundColor: colors.border, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }, alternateVisual: { backgroundColor: colors.vegetable }, mealBody: { padding: 14 }, mealTitle: { fontFamily: fontFamilies.bodyBold, fontSize: fontSizes.body, lineHeight: lineHeights.body, color: colors.forest }, description: { fontFamily: fontFamilies.body, fontSize: fontSizes.bodySmall, lineHeight: lineHeights.bodySmall, color: colors.muted, marginTop: 6, marginBottom: 12 }, mealBottom: { flexDirection: 'row', alignItems: 'center', gap: 8 }, selectButton: { borderWidth: 1, borderColor: colors.border, backgroundColor: colors.cream, borderRadius: 10, padding: 11 }, inlineActions: { flexDirection: 'row', justifyContent: 'space-between' }, textButton: { minHeight: 44, justifyContent: 'center' }, link: { fontFamily: fontFamilies.bodyBold, fontSize: fontSizes.bodySmall, color: colors.coral }, notice: { backgroundColor: colors.activityBanner, padding: 12, borderRadius: 12, marginTop: 10 }, loading: { paddingVertical: 15, flexDirection: 'row', alignItems: 'center', gap: 10 }, error: { fontFamily: fontFamilies.body, fontSize: fontSizes.bodySmall, lineHeight: lineHeights.bodySmall, color: colors.coral, marginTop: 15 },
 });

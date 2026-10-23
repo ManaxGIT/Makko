@@ -1,3 +1,4 @@
+import { RecipeLink } from '@/features/meals/RecipeLink';
 import type { ComponentProps, ReactNode } from 'react';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
@@ -448,6 +449,7 @@ export default function OrderTrackingScreen() {
             <Text style={styles.summaryNote}>Tổng tiền giữ nguyên khi mua đủ, đúng yêu cầu.</Text>
             {order.status === 'delivering' && <Text style={styles.summaryNote}>Khu vực giao: {[detail.deliveryWard, detail.deliveryDistrict, detail.deliveryCity].filter(Boolean).join(', ') || 'Chưa có thông tin'}</Text>}
           </> : <Text style={styles.summaryNote}>{detailError ? 'Chưa tải được thông tin đơn. Kéo xuống để thử lại.' : 'Đang tải thông tin đơn…'}</Text>}
+          {order.role === 'customer' && order.hasRecipe && <RecipeLink onPress={() => router.push(`/requests/${id}/recipe`)} />}
         </View>
         <View style={styles.journeySection}>
           <View style={styles.journeyHeadingRow}>

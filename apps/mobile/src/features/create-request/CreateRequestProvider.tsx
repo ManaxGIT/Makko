@@ -4,12 +4,12 @@ import { getPreferredAddress, saveAddress, SavedAddress } from '@/features/addre
 import { getHomeDashboard } from '@/features/home/api';
 import { ApiError } from '@/lib/api';
 import { buildRequestBody, createAndPublishRequest, CreateRequestBody, EditRequestBody, getEditableRequest, updateRequest } from './api';
-import type { MealSuggestion } from '@/features/meals/api';
+import type { MealSuggestion, RecipeSnapshot } from '@/features/meals/api';
 import type { OrderActionResult } from '@/features/orders/api';
 import { useAuth } from '@/features/auth/AuthProvider';
 
 export type RequestItem = { id: string; name: string; quantity: string; unit: string; note: string; allowSubstitution: boolean };
-export type RequestForm = DeliveryAddress & { title: string; originalDeliverBy?: string | null; items: RequestItem[]; day: 'today' | 'tomorrow'; time: string; budget: string; fee: string; payment: 'cash' | 'bank_transfer'; deliveryNote: string };
+export type RequestForm = DeliveryAddress & { title: string; recipe?: RecipeSnapshot | null; originalDeliverBy?: string | null; items: RequestItem[]; day: 'today' | 'tomorrow'; time: string; budget: string; fee: string; payment: 'cash' | 'bank_transfer'; deliveryNote: string };
 // Start with an empty shopping list; this flow publishes real requests.
 const initialForm = (): RequestForm => ({
   title: '', items: [], phone: '', line1: '', province: null, ward: null, day: 'today', time: '18:00', budget: '', fee: '25000', payment: 'cash', deliveryNote: '',
@@ -190,8 +190,8 @@ function AccountRequestProvider({ children, userId, editId }: PropsWithChildren<
       pendingSubmission.current = null;
       setPublishedRequest(null); setRequestLocked(false);
       setForm(current => ({ ...current,
-        title: meal.title, budget: String(meal.suggestedGoodsAmount),
-        items: meal.ingredients.map((i, index) => ({ id: `meal-${Date.now()}-${index}`, name: i.name, quantity: String(i.quantity), unit: i.unit, note: '', allowSubstitution: false })),
+        title: meal.title, recipe: meal.recipe, budget: String(meal.suggestedGoodsAmount),
+        items: meal.ingredients.map((i, index) => ({ id: `meal-${Date.now()}-${index}`, name: i.name, quantity: String(i.quantity), unit: i.unit, note: i.note ?? '', allowSubstitution: false })),
       }));
     },
     addressLoading, addressError, savingAddress, publishing, requestLocked, publishedRequest, publishRequest,

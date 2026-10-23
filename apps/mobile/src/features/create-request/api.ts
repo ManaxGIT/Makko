@@ -2,9 +2,11 @@ import { invalidateOrderLists } from '@/features/orders/listCache';
 import { apiGet, apiPatch, apiPost } from '@/lib/api';
 import type { OrderActionResult } from '@/features/orders/api';
 import type { OrderAddressSnapshot } from '@/features/addresses/addressForm';
+import type { RecipeSnapshot } from '@/features/meals/api';
 import type { RequestForm } from './CreateRequestProvider';
 
 export type CreateRequestBody = {
+  recipe?: RecipeSnapshot;
   submissionKey: string;
   title: string | null;
   addressId: string | null;
@@ -37,6 +39,7 @@ export function buildRequestBody(form: RequestForm, submissionKey: string, now =
   if (!form.budget || Number(form.budget) <= 0) throw new Error('Nhập tiền mua hàng lớn hơn 0đ để chốt trước khi đăng.');
   if (!/^\d{1,10}$/.test(form.fee) || (form.budget && !/^\d{1,10}$/.test(form.budget))) throw new Error('Tiền hàng và phí đi chợ phải là số tiền hợp lệ.');
   return {
+    ...(!editing && form.recipe ? { recipe: form.recipe } : {}),
     submissionKey, title: title || null, addressId: form.savedAddress?.id ?? null, items, deliverBy: target.toISOString(),
     estimatedItemsTotal: form.budget || null, deliveryFee: form.fee,
     paymentMethod: form.payment, deliveryNote: form.deliveryNote.trim() || null,

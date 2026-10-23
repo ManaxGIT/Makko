@@ -5,6 +5,7 @@ from uuid import UUID
 
 from fastapi import HTTPException
 from app.repositories.supabase import SupabaseError, SupabaseRepository
+from app.services.recipes import RecipeService
 from app.schemas.explore import ExploreItem, ExploreRequest
 from app.schemas.home import HomeDashboard, HomeLocation, HomeProfile
 from app.schemas.orders import (
@@ -230,6 +231,7 @@ class MarketplaceService:
                 counterpart_ids.add(counterpart_id)
         profiles = await self._profiles(sorted(counterpart_ids))
 
+        recipe_ids = await RecipeService(self.repository).ids([r["id"] for r in owned], user_id)
         results: list[OrderSummary] = []
         for request in request_map.values():
             assignment = assignments.get(request["id"])
@@ -242,7 +244,7 @@ class MarketplaceService:
                 rating_count=profile["rating_count"],
             ) if profile else None
             results.append(OrderSummary(
-                **request, role=role, item_count=item_counts[request["id"]],
+                **request, role=role, has_recipe=role == "customer" and request["id"] in recipe_ids, item_count=item_counts[request["id"]],
                 counterpart=counterpart,
                 assignment_accepted_at=assignment.get("accepted_at") if assignment else None,
             ))
@@ -302,7 +304,9 @@ class MarketplaceService:
                 "limit": "100",
             },
         )
+        recipe_ids = await RecipeService(self.repository).ids([str(request_id)], user_id) if is_customer else set()
         return OrderTracking(
+            has_recipe=is_customer and str(request_id) in recipe_ids,
             id=request["id"],
             role="customer" if is_customer else "shopper",
             status=request["status"],

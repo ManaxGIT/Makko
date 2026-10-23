@@ -123,3 +123,19 @@ def test_fixed_amount_is_required(api, amount):
     client, repo, _ = api
     assert client.post('/api/v1/orders', json={**BODY, 'estimatedItemsTotal': amount}).status_code == 422
     assert not repo.calls
+
+
+def test_recipe_is_saved_in_the_same_creation_rpc(api):
+    from tests.unit.test_recipes import SNAPSHOT
+    client, repo, _ = api
+    result = client.post('/api/v1/orders', json={**BODY, 'recipe': SNAPSHOT})
+    assert result.status_code == 201
+    assert len(repo.calls) == 1
+    assert repo.calls[0][1]['p_request']['recipe'] == SNAPSHOT
+
+
+def test_invalid_recipe_rejects_entire_creation(api):
+    from tests.unit.test_recipes import SNAPSHOT
+    client, repo, _ = api
+    assert client.post('/api/v1/orders', json={**BODY, 'recipe': {**SNAPSHOT, 'steps': []}}).status_code == 422
+    assert not repo.calls

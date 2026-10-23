@@ -5,6 +5,7 @@ from uuid import UUID
 from pydantic import AwareDatetime, ConfigDict, Field, StringConstraints, field_validator
 
 from app.schemas.common import ApiModel, to_camel
+from app.schemas.recipes import RecipeSnapshot
 
 Text = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 Money = Annotated[Decimal, Field(ge=0, max_digits=12, decimal_places=2, allow_inf_nan=False)]
@@ -21,6 +22,7 @@ class CreateRequestItem(ApiModel):
 
 class CreateRequestBody(ApiModel):
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True, extra='forbid')
+    recipe: RecipeSnapshot | None = None
     submission_key: Annotated[str, StringConstraints(pattern=r'^[a-zA-Z0-9_-]{16,100}$')]
     address_id: UUID
     title: str | None = None

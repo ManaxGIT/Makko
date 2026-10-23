@@ -1,3 +1,4 @@
+import { RecipeLink } from '@/features/meals/RecipeLink';
 import type { ComponentProps } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -125,6 +126,7 @@ function OrderCard({
 
       {isCompleted && <Text style={styles.shopperLabel}>{order.role === 'customer' ? 'Bạn là người nhờ mua' : 'Bạn là người đi chợ'}</Text>}
       <Text style={styles.orderTitle}>{order.title}</Text>
+      {order.role === 'customer' && order.hasRecipe && <RecipeLink compact onPress={() => router.push(`/requests/${order.id}/recipe`)} />}
       <Text style={styles.orderSummary}>{order.itemCount} món · {formatDeadline(order.deliverBy)}</Text>
 
       {!isWaiting && order.counterpart ? (

@@ -21,6 +21,7 @@ class OrderCounterpart(ApiModel):
 
 
 class OrderSummary(ApiModel):
+    has_recipe: bool = False
     id: UUID
     role: Literal["customer", "shopper"]
     title: str
@@ -46,6 +47,7 @@ class OrderStatusEvent(ApiModel):
 
 
 class OrderTracking(ApiModel):
+    has_recipe: bool = False
     id: UUID
     role: Literal["customer", "shopper"]
     status: OrderStatus

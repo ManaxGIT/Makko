@@ -7,6 +7,8 @@ from app.dependencies.auth import get_current_user
 from app.dependencies.repositories import get_repository
 from app.models.user import CurrentUser
 from app.repositories.supabase import SupabaseRepository
+from app.services.recipes import RecipeService
+from app.schemas.recipes import RecipeSnapshot
 from app.schemas.orders import OrderActionResult, OrderDetail, OrderSummary, OrderTracking, TransitionOrderBody
 from app.services.chat import ChatService
 from app.schemas.chat import ChatConversation, ChatMessage, SendMessageBody
@@ -20,6 +22,15 @@ from app.schemas.purchase_evidence import EvidencePhoto, SubmitEvidenceBody, Sub
 from app.services.purchase_evidence import PurchaseEvidenceService
 
 router = APIRouter(prefix="/orders", tags=["orders"])
+
+
+@router.get('/{request_id}/recipe', response_model=RecipeSnapshot, response_model_by_alias=True)
+async def get_order_recipe(
+    request_id: UUID,
+    user: Annotated[CurrentUser, Depends(get_current_user)],
+    repository: Annotated[SupabaseRepository, Depends(get_repository)],
+) -> RecipeSnapshot:
+    return await RecipeService(repository).get(request_id, user.id)
 
 
 @router.get("/{request_id}/edit", response_model=EditableRequest, response_model_by_alias=True)
