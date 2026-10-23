@@ -369,7 +369,7 @@ class MarketplaceService:
         request = await self.repository.select_one(
             "shopping_requests",
             params={
-                "select": "id,customer_id,title,description,status,currency,estimated_items_total,delivery_fee,deliver_by,delivery_ward,delivery_district,delivery_city,delivery_latitude,delivery_longitude,published_at",
+                "select": "id,customer_id,title,description,status,delivery_line1,payment_method,currency,estimated_items_total,delivery_fee,deliver_by,delivery_ward,delivery_district,delivery_city,delivery_latitude,delivery_longitude,published_at",
                 "id": f"eq.{request_id}",
             },
         )
@@ -414,6 +414,7 @@ class MarketplaceService:
             )
 
         return OrderDetail(
+            delivery_line1=request.get('delivery_line1'), payment_method=request.get('payment_method'),
             id=request["id"], customer_id=request["customer_id"],
             owner_display_name=profile["display_name"],
             owner_avatar_path=profile.get("avatar_path"),

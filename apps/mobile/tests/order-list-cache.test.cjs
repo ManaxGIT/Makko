@@ -77,3 +77,65 @@ test('a failed background read keeps the previous list and permits retry', async
   const updated = [{ id: 'two' }];
   assert.equal(await c.fetchOrderList('alice', 'active', async () => updated), updated);
 });
+
+test('reputation deduplicates reads and caches an empty result per account', async () => {
+  const c = cache(), request = deferred();
+  let calls = 0;
+  const load = () => { calls++; return request.promise; };
+  const a = c.fetchReputation('alice', load), b = c.fetchReputation('alice', load);
+  request.resolve({ averageRating: 0, ratingCount: 0, reviews: [], hasMore: false });
+  await Promise.all([a, b]);
+  assert.equal(calls, 1);
+  assert.equal(c.reputationEntry('alice').data.reviews.length, 0);
+  assert.ok(c.reputationEntry('alice').updatedAt > 0);
+  assert.equal(c.reputationEntry('bob').data, undefined);
+});
+
+test('reputation retains pages during refresh and invalidation, rejects obsolete page writes', async () => {
+  const c = cache();
+  await c.fetchReputation('alice', async () => ({ averageRating: 5, ratingCount: 3, reviews: [{ id: 'a' }], hasMore: true }));
+  const first = c.reputationEntry('alice').data;
+  c.appendReputation('alice', first, { averageRating: 5, ratingCount: 3, reviews: [{ id: 'b' }], hasMore: true });
+  assert.equal(c.reputationEntry('alice').data.reviews.length, 2);
+  assert.equal(c.appendReputation('alice', first, { reviews: [{ id: 'obsolete' }] }), null);
+  await c.fetchReputation('alice', async () => ({ averageRating: 5, ratingCount: 4, reviews: [{ id: 'new' }, { id: 'a' }], hasMore: true }));
+  assert.equal(c.reputationEntry('alice').data.reviews.length, 3);
+  assert.equal(c.reputationEntry('alice').data.reviews[0].id, 'new');
+  c.invalidateOrderLists();
+  assert.equal(c.reputationEntry('alice').updatedAt, 0);
+  assert.equal(c.reputationEntry('alice').data.reviews.length, 3);
+});
+
+test('clearing reputation rejects in-flight responses and refresh errors keep visible content', async () => {
+  const c = cache(), request = deferred();
+  await c.fetchReputation('alice', async () => ({ ratingCount: 1, reviews: [{ id: 'a' }], hasMore: false }));
+  await assert.rejects(c.fetchReputation('alice', async () => { throw Error('offline'); }));
+  assert.equal(c.reputationEntry('alice').data.reviews.length, 1);
+  const read = c.fetchReputation('alice', () => request.promise);
+  c.clearOrderLists();
+  request.resolve({ ratingCount: 1, reviews: [{ id: 'private' }], hasMore: false });
+  assert.equal(await read, null);
+  assert.equal(c.reputationEntry('alice').data, undefined);
+});
+
+test('profile saves patch known fields and reject an older read without changing statistics', async () => {
+  const c = cache(), pending = deferred();
+  await c.fetchAccountProfile('alice', async () => ({ displayName: 'Old', avatarPath: null, ratingCount: 3 }));
+  const read = c.fetchAccountProfile('alice', () => pending.promise);
+  c.patchAccountProfile('alice', { displayName: 'New', avatarPath: 'alice/photo.jpg', phone: null, bio: null });
+  pending.resolve({ displayName: 'Old', ratingCount: 3 });
+  assert.equal(await read, null);
+  assert.equal(c.accountProfileEntry('alice').data.displayName, 'New');
+  assert.equal(c.accountProfileEntry('alice').data.ratingCount, 3);
+  assert.equal(c.accountProfileEntry('bob').data, undefined);
+});
+
+test('cleared profile caches cannot be restored by reads or a late save', async () => {
+  const c = cache(), pending = deferred();
+  const read = c.fetchAccountProfile('alice', () => pending.promise);
+  c.clearOrderLists();
+  c.patchAccountProfile('alice', { displayName: 'Private' });
+  pending.resolve({ displayName: 'Private' });
+  assert.equal(await read, null);
+  assert.equal(c.accountProfileEntry('alice').data, undefined);
+});

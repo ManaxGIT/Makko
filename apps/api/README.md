@@ -31,6 +31,21 @@ tables or read-only RPCs directly.
 
 - `GET /api/v1/health`
 - `GET /api/v1/home`
+- `GET /api/v1/home/profile` — own profile, rating average/count, and exact
+  `completedCustomerCount` / `completedShopperCount`. Customer totals count
+  completed requests; shopper totals count completed, unreleased assignments.
+- `PATCH /api/v1/home/profile` — save `displayName` (2–80 characters),
+  optional `phone` (up to 32), `bio` (up to 500), and explicit `avatarPath`
+  (path or null to remove). Uses the authenticated `update_account_profile` RPC.
+  Upload JPEG/PNG/WebP (up to 10 MB) to the private `profile-avatars` bucket at
+  `<user-id>/<unique-filename>` before saving. Images stay immutable; no client
+  overwrite/delete. Signed reads allow the owner or an active signed-in viewer
+  of a currently referenced avatar. Profile edits never change Auth credentials
+  or existing delivery snapshots.
+- `GET /api/v1/home/profile/reviews?limit=20&offset=0` — received reviews for
+  the authenticated account, newest first, with average/count and `hasMore`.
+  Returns reviewer display name/role, rating, optional comment, date and related
+  order ID/title. `limit` is 1–50; account identity always comes from the token.
 - `GET /api/v1/explore` — `query` tìm nội dung không dấu; `province_code` và `ward_code` lọc theo địa chỉ giao của đơn. `ward_code` cần đi cùng `province_code`. Khi chọn tỉnh/thành, bán kính không áp dụng; tọa độ (nếu có) vẫn dùng để tính khoảng cách.
 - `GET /api/v1/explore/{request_id}`
 - `GET /api/v1/orders`
@@ -41,6 +56,13 @@ tables or read-only RPCs directly.
 - `POST /api/v1/orders/{request_id}/release`
 - `POST /api/v1/orders/{request_id}/publish`
 - `PATCH /api/v1/orders/{request_id}/status`
+- `GET /api/v1/orders/{request_id}/review` — current participant's review,
+  counterpart, and eligibility.
+- `POST /api/v1/orders/{request_id}/review` — `{ "rating": 5, "comment": null }`;
+  integer 1–5, optional comment up to 1,000 characters. Only current participants
+  in completed orders can submit. The server chooses the recipient. An identical
+  retry returns the saved review; changing a saved review returns 409. The
+  `submit_order_review` RPC saves the review and updates reputation atomically.
 
 All endpoints except health and OpenAPI documentation require
 `Authorization: Bearer <access-token>`.

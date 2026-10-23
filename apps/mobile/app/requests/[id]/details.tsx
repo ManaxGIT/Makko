@@ -1,3 +1,4 @@
+import { AvatarImage } from '@/components/ui/AvatarImage';
 import type { ComponentProps } from 'react';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
@@ -14,6 +15,8 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { CompletedOrderDetails } from '@/features/orders/CompletedOrderDetails';
+import { useAuth } from '@/features/auth/AuthProvider';
 import { EvidenceGallery } from '@/features/orders/EvidenceGallery';
 import { colors } from '@/theme/colors';
 import { fontFamilies, fontSizes } from '@/theme/typography';
@@ -129,7 +132,13 @@ function ShoppingItem({
   );
 }
 
-export default function RequestDetailsScreen() {
+export default function RequestDetailsRoute() {
+  const { session } = useAuth();
+  const { id } = useLocalSearchParams<{ id: string }>();
+  return <RequestDetailsScreen key={`${session?.user.id ?? 'signed-out'}:${id}`} />;
+}
+
+function RequestDetailsScreen() {
   const router = useRouter();
   const { coordinates } = useCurrentLocation();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -229,6 +238,8 @@ export default function RequestDetailsScreen() {
     }
   };
 
+  if (request && participantStatus === 'completed') return <CompletedOrderDetails order={request as import('@/features/orders/api').OrderDetail} />;
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
       <View style={styles.header}>
@@ -279,7 +290,7 @@ export default function RequestDetailsScreen() {
         <View style={styles.content}>
           <View style={styles.ownerRow}>
             <View style={styles.ownerAvatar}>
-              <Text style={styles.ownerAvatarText}>{initials(request.ownerDisplayName)}</Text>
+              <Text style={styles.ownerAvatarText}>{initials(request.ownerDisplayName)}</Text><AvatarImage path={request.ownerAvatarPath} borderRadius={12} />
             </View>
             <View style={styles.ownerCopy}>
               <Text style={styles.ownerName}>{request.ownerDisplayName}</Text>

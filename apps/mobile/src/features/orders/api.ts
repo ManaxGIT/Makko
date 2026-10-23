@@ -50,6 +50,8 @@ export type OrderTracking = {
 };
 
 export type OrderDetail = ExploreRequest & {
+  deliveryLine1: string | null;
+  paymentMethod: string | null;
   role: 'customer' | 'shopper';
   status: OrderStatus;
 };
@@ -83,4 +85,29 @@ export function publishOrder(requestId: string) {
 
 export function transitionOrder(requestId: string, status: OrderStatus) {
   return apiPatch<OrderActionResult>(`/api/v1/orders/${requestId}/status`, { status }).then(result => { if (status !== 'cancelled') invalidateOrderLists(); return result; });
+}
+
+export type OrderReview = { id: string; rating: number; comment: string | null; createdAt: string };
+export type OrderReviewContext = {
+  requestId: string; title: string; role: 'customer' | 'shopper';
+  counterpart: NonNullable<OrderSummary['counterpart']>;
+  canReview: boolean; review: OrderReview | null;
+};
+export function getOrderReview(id: string) {
+  return apiGet<OrderReviewContext>(`/api/v1/orders/${id}/review`);
+}
+export function submitOrderReview(id: string, rating: number, comment: string) {
+  return apiPost<OrderReview>(`/api/v1/orders/${id}/review`, { rating, comment: comment.trim() || null })
+    .then(result => { invalidateOrderLists(); return result; });
+}
+
+export type ReceivedReview = OrderReview & {
+  requestId: string; requestTitle: string; reviewerName: string;
+  reviewerRole: 'customer' | 'shopper';
+};
+export type AccountReputation = {
+  averageRating: number; ratingCount: number; reviews: ReceivedReview[]; hasMore: boolean;
+};
+export function getReceivedReviews(offset = 0, limit = 20) {
+  return apiGet<AccountReputation>('/api/v1/home/profile/reviews', { offset, limit });
 }

@@ -113,6 +113,15 @@ and the corresponding Supabase provider/configuration have been verified.
   database trigger/profile behavior, and a real device or simulator flow before
   describing authentication as working end-to-end.
 
+## Personal profile
+
+- User decision (2026-10-24): personal profile editing includes display name,
+  contact phone, bio and avatar. Keep changes and photo selection as a draft
+  until “Lưu thay đổi”; removing an avatar restores initials. These edits do
+  not change Auth login identifiers or delivery snapshots. Use FastAPI for
+  profile reads/writes and the private `profile-avatars` Storage flow for images.
+  Reuse shared avatar rendering and preserve initials when an image cannot load.
+
 ## Saved delivery addresses
 
 - Saved account addresses may omit coordinates (user decision, 2026-10-21).
@@ -148,6 +157,15 @@ and the corresponding Supabase provider/configuration have been verified.
 
 ## Figma implementation
 
+- User instruction (2026-10-23): enforce Makko's existing brand colors in every
+  UI, including HTML prototypes under `design/figma-import/`. Before editing,
+  inspect `apps/mobile/src/theme/colors.ts` and an accepted screen/shared
+  component for the same control. Match color roles as well as hex values:
+  primary actions use orange with forest text, coral is the existing accent,
+  and surfaces use the existing background/surface tokens. Do not substitute
+  forest-filled primary actions or introduce a new palette without explicit
+  approval. Before presenting a design, visually verify primary actions,
+  selected states, text, and surfaces against those references.
 - Use a design-first workflow for new UI requests. When the user asks to
   "create/design a UI" and has not supplied an approved Figma node, first create
   or update a browser-renderable prototype under `design/figma-import/` so it can
@@ -173,6 +191,15 @@ and the corresponding Supabase provider/configuration have been verified.
 - Preserve the visual hierarchy and behavior from Figma while using the active
   project typography and safe-area rules unless the user explicitly requests a
   design-system change.
+
+## Google API usage
+
+- User instruction (2026-10-23): minimize real Google API calls during development
+  and verification, including Gemini. Use mocks/fixtures for automated tests and
+  unrelated feature checks. Make a real call only when necessary to verify the
+  requested Google integration; use the smallest sufficient request and avoid
+  repeated calls or automatic retries for verification. Never call Google APIs
+  merely to check connectivity or validate an unrelated feature.
 
 ## Verification
 
@@ -200,6 +227,13 @@ and the corresponding Supabase provider/configuration have been verified.
 
 ## Delivery and receipt confirmation
 
+- User decision (2026-10-23): after the customer successfully confirms receipt,
+  show an action to rate the assigned shopper immediately. Rating is optional
+  at that point and remains available later through Account → Order history →
+  order details. Preserve the existing tracking screen and its timeline; place
+  the rating action above “Xem chi tiết đơn” after successful receipt confirmation.
+  Do not introduce a separate completion screen. Use the existing shared header/back-button pattern for order
+  history instead of a standalone text back link above the page heading.
 - User decision (2026-10-23): delivery completion requires two separate confirmations.
   Only the assigned shopper may move `delivering -> delivered`; only the customer
   may move `delivered -> completed`. Neither party may skip the other confirmation.
@@ -223,6 +257,10 @@ and the corresponding Supabase provider/configuration have been verified.
 
 ## Order lists and deletion
 
+- User decision (2026-10-23): Account statistics “Đơn đã nhờ thành công”
+  count only the account's completed requests; “Lần đi giúp” counts
+  only completed, unreleased assignments. Use actual account-scoped counts,
+  never placeholder totals.
 - User decision (2026-10-23): the Orders tab separates active orders by role:
   posted requests (`customer`) and accepted requests (`shopper`). Completed and
   cancelled orders are accessed through Account → Order history.

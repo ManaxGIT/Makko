@@ -58,6 +58,8 @@ class OrderTracking(ApiModel):
 
 
 class OrderDetail(ExploreRequest):
+    delivery_line1: str | None = None
+    payment_method: str | None = None
     role: Literal["customer", "shopper"]
     status: OrderStatus
 

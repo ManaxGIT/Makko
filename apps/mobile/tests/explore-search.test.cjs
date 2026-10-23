@@ -33,6 +33,7 @@ function screen() {
     if (name === 'react/jsx-runtime') return { jsx, jsxs: jsx };
     if (name === 'react-native') return { StyleSheet: { create: x => x }, ...Object.fromEntries(['ActivityIndicator','Pressable','RefreshControl','ScrollView','Text','TextInput','View'].map(x => [x, x])) };
     if (name === 'expo-router') return { useFocusEffect() {}, useRouter: () => ({}) };
+    if (name === '@/components/ui/AvatarImage') return { AvatarImage: 'AvatarImage' };
     if (name === 'expo-symbols') return { SymbolView: 'SymbolView' };
     if (name === 'react-native-safe-area-context') return { SafeAreaView: 'SafeAreaView' };
     if (name === '@/features/auth/AuthProvider') return { useAuth: () => ({ session: { user: { id: 'user-a' } } }) };

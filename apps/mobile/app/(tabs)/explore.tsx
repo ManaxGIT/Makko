@@ -1,3 +1,4 @@
+import { AvatarImage } from '@/components/ui/AvatarImage';
 import type { ComponentProps } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -15,7 +16,7 @@ import { fontFamilies, fontSizes, letterSpacing, lineHeights } from '@/theme/typ
 
 type SymbolName = ComponentProps<typeof SymbolView>['name'];
 type Request = {
-  id: string; owner: string; initials: string; rating: string; distance: string;
+  id: string; avatarPath: string | null; owner: string; initials: string; rating: string; distance: string;
   deadline: string; title: string; address: string;
   items: string[]; extra: number; fee: string; avatarColor: string; avatarText: string;
 };
@@ -47,6 +48,7 @@ function toCardRequest(request: ExploreRequest): Request {
   return {
     id: request.id,
     owner: request.ownerDisplayName,
+    avatarPath: request.ownerAvatarPath,
     initials,
     rating: request.ownerRatingCount > 0 ? request.ownerAverageRating.toFixed(1) : 'Mới',
     distance: formatDistance(request.distanceMeters),
@@ -73,7 +75,7 @@ function RequestCard({ request }: { request: Request }) {
     <View style={styles.card}>
       <View style={styles.ownerRow}>
         <View style={[styles.avatar, { backgroundColor: request.avatarColor }]}>
-          <Text style={[styles.avatarText, { color: request.avatarText }]}>{request.initials}</Text>
+          <Text style={[styles.avatarText, { color: request.avatarText }]}>{request.initials}</Text><AvatarImage path={request.avatarPath} borderRadius={12} />
         </View>
         <View style={styles.ownerCopy}>
           <Text style={styles.owner}>{request.owner}</Text>

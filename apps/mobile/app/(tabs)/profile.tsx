@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ComponentProps } from 'react';
+import { useCallback, useMemo, useState, type ComponentProps } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -9,20 +9,20 @@ import {
   View,
 } from 'react-native';
 import { SymbolView } from 'expo-symbols';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAuth } from '@/features/auth/AuthProvider';
+import { accountProfileEntry, fetchAccountProfile } from '@/features/orders/listCache';
+import { getAccountProfile, type AccountProfile } from '@/features/account/api';
+import { AvatarImage } from '@/components/ui/AvatarImage';
 import { supabase } from '@/lib/supabase';
 import { colors } from '@/theme/colors';
 import { fontFamilies, fontSizes } from '@/theme/typography';
 
 type SymbolName = ComponentProps<typeof SymbolView>['name'];
 
-type Profile = {
-  display_name: string;
-  created_at: string;
-};
+type Profile = AccountProfile;
 
 function getInitials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -42,9 +42,9 @@ function formatMemberSince(value: string) {
 }
 
 const stats = [
-  { value: '4.9', label: 'Đánh giá' },
-  { value: '18', label: 'Đơn đã nhờ' },
-  { value: '7', label: 'Lần đi giúp' },
+  { value: '—', label: 'Đánh giá' },
+  { value: '—', label: 'Đơn đã nhờ thành công' },
+  { value: '—', label: 'Lần đi giúp' },
 ];
 
 const menuItems: Array<{
@@ -60,7 +60,7 @@ const menuItems: Array<{
   },
   {
     title: 'Đánh giá & uy tín',
-    subtitle: 'Xem 18 lượt đánh giá',
+    subtitle: 'Xem lượt đánh giá',
     symbol: { ios: 'heart', android: 'favorite', web: 'favorite' },
   },
   {
@@ -119,41 +119,38 @@ function MenuRow({ title, subtitle, symbol, isLast, onPress }: {
   );
 }
 
-export default function ProfileScreen() {
+export default function ProfileRoute() {
+  const { session } = useAuth();
+  return <ProfileScreen key={session?.user.id ?? 'signed-out'} />;
+}
+function ProfileScreen() {
   const router = useRouter();
   const { session } = useAuth();
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(() => session ? accountProfileEntry(session.user.id).data ?? null : null);
   const [loading, setLoading] = useState(true);
   const [signingOut, setSigningOut] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     if (!session?.user.id) return;
-
+    const entry = accountProfileEntry(session.user.id);
+    if (entry.data) { setProfile(entry.data); setLoading(false); }
+    if (entry.data && Date.now() - entry.updatedAt < 30_000) return;
     let active = true;
-    setLoading(true);
-    supabase
-      .from('profiles')
-      .select('display_name, created_at')
-      .eq('id', session.user.id)
-      .single()
-      .then(({ data, error: profileError }) => {
-        if (!active) return;
-        setProfile(data);
-        setError(profileError ? 'Không thể tải hồ sơ lúc này.' : null);
-        setLoading(false);
-      });
-
+    void fetchAccountProfile(session.user.id, () => getAccountProfile(session.user.id)).then(data => {
+      if (active && data) { setProfile(data); setError(null); }
+    }).catch(() => { if (active) setError('Không thể tải hồ sơ lúc này.'); })
+      .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [session?.user.id]);
+  }, [session?.user.id]));
 
-  const displayName = profile?.display_name
+  const displayName = profile?.displayName
     || session?.user.user_metadata.full_name
     || session?.user.user_metadata.name
     || session?.user.email?.split('@')[0]
     || 'Người dùng Makko';
   const initials = useMemo(() => getInitials(displayName), [displayName]);
-  const memberSince = formatMemberSince(profile?.created_at || session?.user.created_at || '');
+  const memberSince = formatMemberSince(profile?.createdAt || session?.user.created_at || '');
 
   const signOut = async () => {
     setSigningOut(true);
@@ -187,7 +184,7 @@ export default function ProfileScreen() {
             <Text style={styles.eyebrow}>GÓC CỦA BẠN</Text>
             <Text style={styles.heading}>Tài khoản</Text>
           </View>
-          <Pressable accessibilityLabel="Mở cài đặt" style={({ pressed }) => [styles.settings, pressed && styles.pressed]}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Mở cài đặt" onPress={() => router.push('/account/personal-info')} style={({ pressed }) => [styles.settings, pressed && styles.pressed]}>
             <AppIcon
               name={{ ios: 'gearshape.fill', android: 'settings', web: 'settings' }}
               size={21}
@@ -199,6 +196,7 @@ export default function ProfileScreen() {
         <View style={styles.profileCard}>
           <View style={styles.avatar}>
             {loading ? <ActivityIndicator color={colors.forestMuted} size="small" /> : <Text style={styles.avatarText}>{initials}</Text>}
+            <AvatarImage path={profile?.avatarPath} borderRadius={18} />
             <View style={styles.onlineDot} />
           </View>
           <View style={styles.profileCopy}>
@@ -213,7 +211,7 @@ export default function ProfileScreen() {
         <View style={styles.statsCard}>
           {stats.map((item, index) => (
             <View key={item.label} style={[styles.stat, index < stats.length - 1 && styles.statDivider]}>
-              <Text style={styles.statValue}>{item.value}</Text>
+              <Text style={styles.statValue}>{item.label === 'Đánh giá' ? profile ? profile.ratingCount ? profile.averageRating.toFixed(2) : 'Mới' : '—' : item.label === 'Đơn đã nhờ thành công' ? profile?.completedCustomerCount ?? '—' : profile?.completedShopperCount ?? '—'}</Text>
               <Text style={styles.statLabel}>{item.label}</Text>
             </View>
           ))}
@@ -224,13 +222,10 @@ export default function ProfileScreen() {
           <View style={styles.kindnessCopy}>
             <Text style={styles.kindnessTitle}>Hạt tử tế của bạn</Text>
             <Text style={styles.kindnessDescription}>
-              Bạn đã giúp 7 người hàng xóm đi chợ.
+              {profile ? `Bạn đã hoàn thành ${profile.completedShopperCount} lần đi chợ giúp.` : 'Đang tải số lần đi chợ giúp…'}
             </Text>
-            <View style={styles.progressTrack}>
-              <View style={styles.progressValue} />
-            </View>
             <Text style={styles.progressCaption}>
-              3 lần nữa để nhận huy hiệu “Người quen của chợ”
+              Tính từ các đơn đã hoàn thành.
             </Text>
           </View>
         </View>
@@ -240,7 +235,8 @@ export default function ProfileScreen() {
             <MenuRow
               key={item.title}
               {...item}
-              onPress={item.title === 'Lịch sử đơn hàng' ? () => router.push('/account/order-history') : item.title === 'Địa chỉ của tôi' ? () => router.push('/account/addresses') : undefined}
+              subtitle={item.title === 'Đánh giá & uy tín' ? profile ? `${profile.ratingCount} lượt đánh giá` : 'Đang tải đánh giá' : item.subtitle}
+              onPress={item.title === 'Lịch sử đơn hàng' ? () => router.push('/account/order-history') : item.title === 'Địa chỉ của tôi' ? () => router.push('/account/addresses') : item.title === 'Đánh giá & uy tín' ? () => router.push('/account/reputation') : item.title === 'Trợ giúp' ? () => router.push('/account/help') : undefined}
               isLast={index === menuItems.length - 1}
             />
           ))}
@@ -392,14 +388,6 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.caption,
     marginTop: 4,
   },
-  progressTrack: {
-    backgroundColor: '#EED8AD',
-    borderRadius: 99,
-    height: 5,
-    marginTop: 12,
-    overflow: 'hidden',
-  },
-  progressValue: { backgroundColor: colors.coral, borderRadius: 99, height: 5, width: '70%' },
   progressCaption: {
     color: '#8F7754',
     fontFamily: fontFamilies.body,

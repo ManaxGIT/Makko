@@ -21,6 +21,9 @@ from app.services.edit_request import EditRequestService
 from app.schemas.purchase_evidence import EvidencePhoto, SubmitEvidenceBody, SubmitDeliveryEvidenceBody
 from app.services.purchase_evidence import PurchaseEvidenceService
 
+from app.schemas.reviews import OrderReview, OrderReviewContext, SubmitReviewBody
+from app.services.reviews import ReviewService
+
 router = APIRouter(prefix="/orders", tags=["orders"])
 
 
@@ -187,3 +190,22 @@ async def send_order_message(
     repository: Annotated[SupabaseRepository, Depends(get_repository)],
 ) -> ChatMessage:
     return await ChatService(repository).send(request_id, body, user.access_token)
+
+
+@router.get('/{request_id}/review', response_model=OrderReviewContext, response_model_by_alias=True)
+async def get_order_review(
+    request_id: UUID,
+    user: Annotated[CurrentUser, Depends(get_current_user)],
+    repository: Annotated[SupabaseRepository, Depends(get_repository)],
+) -> OrderReviewContext:
+    return await ReviewService(repository).get(request_id, user.id)
+
+
+@router.post('/{request_id}/review', response_model=OrderReview, response_model_by_alias=True, status_code=201)
+async def submit_order_review(
+    request_id: UUID,
+    body: SubmitReviewBody,
+    user: Annotated[CurrentUser, Depends(get_current_user)],
+    repository: Annotated[SupabaseRepository, Depends(get_repository)],
+) -> OrderReview:
+    return await ReviewService(repository).submit(request_id, body, user.access_token)

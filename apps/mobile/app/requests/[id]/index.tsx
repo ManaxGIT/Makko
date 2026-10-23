@@ -1,3 +1,4 @@
+import { AvatarImage } from '@/components/ui/AvatarImage';
 import { RecipeLink } from '@/features/meals/RecipeLink';
 import type { ComponentProps, ReactNode } from 'react';
 import { useCallback, useMemo, useRef, useState } from 'react';
@@ -413,7 +414,7 @@ export default function OrderTrackingScreen() {
 
           <View style={styles.shopperCard}>
             <View style={styles.shopperAvatar}>
-              <Text style={styles.shopperAvatarText}>{initials(counterpartName)}</Text>
+              <Text style={styles.shopperAvatarText}>{initials(counterpartName)}</Text><AvatarImage path={order.counterpart?.avatarPath} borderRadius={16} />
             </View>
             <View style={styles.shopperCopy}>
               <Text style={styles.recipientLabel}>
@@ -484,6 +485,7 @@ export default function OrderTrackingScreen() {
       </ScrollView>}
 
       {!loading && order ? <View style={styles.footer}>
+        {order.status === 'completed' && order.counterpart && <Pressable accessibilityRole="button" onPress={() => router.push(`/requests/${id}/review`)} style={({ pressed }) => [styles.ratingButton, pressed && styles.pressed]}><Text style={styles.ratingButtonLabel}>{order.role === 'customer' ? 'Đánh giá người đi chợ' : 'Đánh giá khách hàng'}</Text></Pressable>}
         <Pressable
           accessibilityRole="button"
           onPress={() => router.push(`/requests/${id}/details`)}
@@ -524,6 +526,8 @@ export default function OrderTrackingScreen() {
 }
 
 const styles = StyleSheet.create({
+  ratingButton: { backgroundColor: colors.orange, borderRadius: 14, padding: 15, alignItems: 'center', marginBottom: 10 },
+  ratingButtonLabel: { color: colors.forest, fontFamily: fontFamilies.bodyBold, fontSize: fontSizes.body },
   waitingMessage: { color: colors.muted, fontFamily: fontFamilies.body, fontSize: fontSizes.bodySmall, lineHeight: lineHeights.bodySmall, textAlign: 'center', paddingVertical: 8 },
   summaryCard: { marginHorizontal: 20, marginTop: 16, padding: 14, gap: 8, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 14 },
   summaryTitle: { fontFamily: fontFamilies.bodyBold, fontSize: fontSizes.bodySmall, color: colors.forest, marginBottom: 2 },

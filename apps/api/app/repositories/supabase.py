@@ -30,6 +30,18 @@ class SupabaseRepository:
             raise SupabaseError("Supabase returned an invalid collection")
         return payload
 
+    async def count(self, table: str, *, params: dict[str, str]) -> int:
+        response = await self._client.head(
+            f"/rest/v1/{table}", params={**params, 'select': 'id'},
+            headers={**self._headers, 'Prefer': 'count=exact'},
+        )
+        if response.is_error:
+            raise SupabaseError(f"Supabase count failed ({response.status_code})")
+        total = response.headers.get('content-range', '').rsplit('/', 1)[-1]
+        if not total.isdigit():
+            raise SupabaseError('Supabase returned an invalid count')
+        return int(total)
+
     async def select_one(
         self,
         table: str,

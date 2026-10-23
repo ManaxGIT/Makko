@@ -1,3 +1,5 @@
+import { AvatarImage } from '@/components/ui/AvatarImage';
+import { OrderScreenHeader } from './OrderScreenHeader';
 import { RecipeLink } from '@/features/meals/RecipeLink';
 import type { ComponentProps } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -132,7 +134,7 @@ function OrderCard({
       {!isWaiting && order.counterpart ? (
         <View style={styles.shopperRow}>
           <View style={styles.shopperAvatar}>
-            <Text style={styles.shopperAvatarText}>{initials(order.counterpart.displayName)}</Text>
+            <Text style={styles.shopperAvatarText}>{initials(order.counterpart.displayName)}</Text><AvatarImage path={order.counterpart.avatarPath} borderRadius={12} />
           </View>
           <View>
             <Text style={styles.shopperLabel}>{counterpartLabel}</Text>
@@ -216,13 +218,7 @@ function OrderList({ history, userId }: { history: boolean; userId: string }) {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={history ? ['top', 'bottom'] : ['top']}>
-      <View style={styles.header}>
-        <View>
-          {history ? <Pressable accessibilityRole="button" onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/profile')}><Text style={styles.backText}>‹ Tài khoản</Text></Pressable> : <Text style={styles.eyebrow}>HOẠT ĐỘNG</Text>}
-          <Text style={styles.heading}>{history ? 'Lịch sử đơn hàng' : 'Đơn hàng'}</Text>
-        </View>
-
-      </View>
+      {history ? <OrderScreenHeader title="Lịch sử đơn hàng" backLabel="Quay lại Tài khoản" onBack={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/profile')} /> : <View style={styles.header}><View><Text style={styles.eyebrow}>HOẠT ĐỘNG</Text><Text style={styles.heading}>Đơn hàng</Text></View></View>}
 
       <View accessibilityRole="tablist" style={styles.tabs}>
         <TabButton
