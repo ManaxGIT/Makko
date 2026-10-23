@@ -178,3 +178,25 @@ React Native Modal. Header navigator quản lý safe area phía trên và cử c
 quay lại iOS; phần nội dung chỉ nhận inset dưới/hai bên. Gợi ý giữ nguyên khi
 pop về `/today-meal`. Dữ liệu xem trước được giới hạn trong navigator theo
 tài khoản, không thay danh sách mua cho đến khi người dùng chọn tiếp tục.
+
+### Địa chỉ của tôi
+
+Tài khoản → Địa chỉ của tôi mở `/account/addresses` (có bảo vệ session).
+Người dùng thêm nhiều địa chỉ, sửa, xóa và đặt mặc định. Địa chỉ đầu tiên tự làm
+mặc định; xóa mặc định cần chọn địa chỉ thay thế nếu còn địa chỉ khác.
+Form dùng nhập địa chỉ thủ công, GPS tùy chọn, không tải Google Maps.
+
+Bước giao hàng của yêu cầu mở popup chọn địa chỉ trượt từ dưới lên. Chọn rồi
+bấm “Dùng địa chỉ này” chỉ đổi địa chỉ cho yêu cầu đang soạn. Đóng popup không
+áp dụng lựa chọn tạm. Có thể thêm địa chỉ mới và dùng ngay; ghi chú đã lưu được
+điền khi chọn địa chỉ và vẫn chỉnh được trong yêu cầu. Đơn mới ưu tiên mặc định,
+nếu chưa có mặc định dùng địa chỉ tạo gần nhất. Đơn đang chỉnh giữ bản chốt địa
+chỉ cũ cho đến khi chủ động chọn địa chỉ khác. Xóa địa chỉ đang chọn ở yêu cầu
+chưa đăng buộc chọn lại; đơn đã đăng giữ bản chốt độc lập.
+
+Cache địa chỉ dùng cùng mẫu account/version như danh sách đơn, với freshness
+5 phút do sổ địa chỉ ít thay đổi. Tài khoản và popup dùng chung subscription;
+thao tác xác nhận cập nhật cache, pull-to-refresh giữ nội dung và lỗi nền có nút
+thử lại. Đăng xuất/đổi tài khoản xóa cache và bỏ qua phản hồi cũ. Tạo địa chỉ vẫn
+trả một bản ghi theo API cũ, nên cập nhật cục bộ rồi đánh dấu stale để tải metadata
+đầy đủ lần đọc kế tiếp. Không tự gửi lại thao tác lưu khi kết quả mạng chưa rõ.

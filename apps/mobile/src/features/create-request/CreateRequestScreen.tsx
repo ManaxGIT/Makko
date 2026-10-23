@@ -6,7 +6,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '@/theme/colors';
 import { fontFamilies, fontSizes, letterSpacing, lineHeights } from '@/theme/typography';
 import { RequestItem, useCreateRequest } from './CreateRequestProvider';
-import { DeliveryAddress, DeliveryAddressFields, formatDeliveryAddress, isDeliveryAddressComplete } from './DeliveryAddressFields';
+import { formatDeliveryAddress, isDeliveryAddressComplete } from './DeliveryAddressFields';
+import { AddressPicker } from '@/features/addresses/AddressPicker';
 
 const money = (value: string | number) => `${Number(value || 0).toLocaleString('vi-VN')}đ`;
 const moneyInput = (value: string) => value ? Number(value).toLocaleString('vi-VN') : '';
@@ -25,12 +26,11 @@ function ReviewDetail({ label, value, last = false }: { label: string; value: st
 }
 export function CreateRequestScreen({ step }: { step: 1 | 2 | 3 | 4 }) {
   const router = useRouter();
-  const { editId, editLoading, editError, reloadEdit, form, patch, reset, addressLoading, addressError, savingAddress, reloadAddress, saveDeliveryAddress, publishRequest, publishing, requestLocked, publishedRequest } = useCreateRequest();
+  const { editId, editLoading, editError, reloadEdit, form, patch, reset, addressLoading, addressError, reloadAddress, selectDeliveryAddress, publishRequest, publishing, requestLocked, publishedRequest } = useCreateRequest();
   const route = (page: string) => (editId ? `/edit/${editId}/${page}` : `/create/${page}`) as Href;
   const [item, setItem] = useState<RequestItem | null>(null);
   const [customUnit, setCustomUnit] = useState(false);
   const [addressOpen, setAddressOpen] = useState(false);
-  const [address, setAddress] = useState<DeliveryAddress>({ phone: '', line1: '', province: null, ward: null });
   const [error, setError] = useState('');
   const [modalError, setModalError] = useState('');
   const nextId = useRef(0);
@@ -42,20 +42,7 @@ export function CreateRequestScreen({ step }: { step: 1 | 2 | 3 | 4 }) {
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => true);
     return () => subscription.remove();
   }, [requestLocked]));
-  function closeEditor() {
-    if (savingAddress) return;
-    setItem(null); setAddressOpen(false);
-  }
-  async function saveEditor() {
-    if (item) { saveItem(); return; }
-    setModalError('');
-    try {
-      await saveDeliveryAddress(address);
-      setError(''); setAddressOpen(false);
-    } catch (error) {
-      setModalError(error instanceof Error ? error.message : 'Không lưu được địa chỉ. Vui lòng thử lại.');
-    }
-  }
+  function closeEditor() { setItem(null); }
   function goBack() {
     if (requestLocked) return;
     if (router.canGoBack()) router.back();
@@ -123,8 +110,8 @@ export function CreateRequestScreen({ step }: { step: 1 | 2 | 3 | 4 }) {
 
       </>}
       {step === 2 && <>
-        <View style={s.sectionRow}><Text style={s.bold}>Địa chỉ nhận</Text><Action disabled={requestLocked} label="Thay đổi" onPress={() => { setAddress({ coordinates: form.coordinates, phone: form.phone, line1: form.line1, province: form.province, ward: form.ward, savedAddress: form.savedAddress }); setModalError(''); setAddressOpen(true); }} /></View>
-        <View style={s.card}><Text style={s.bold}>{form.phone || 'Chưa có số điện thoại liên hệ'}</Text><Text style={s.description}>{formatDeliveryAddress(form) || 'Chọn Thay đổi để nhập địa chỉ'}</Text><Text style={s.small}>{form.savedAddress ? 'Địa chỉ đã lưu · Tự dùng cho lần sau' : form.orderAddress ? 'Địa chỉ đang dùng cho đơn này' : 'Lưu địa chỉ để dùng cho lần này và lần sau'}</Text></View>
+        <View style={s.sectionRow}><Text style={s.bold}>Địa chỉ nhận</Text><Action disabled={requestLocked} label="Thay đổi" onPress={() => setAddressOpen(true)} /></View>
+        <View style={s.card}><Text style={s.bold}>{form.phone || 'Chưa có số điện thoại liên hệ'}</Text><Text style={s.description}>{formatDeliveryAddress(form) || 'Chọn Thay đổi để nhập địa chỉ'}</Text><Text style={s.small}>{form.savedAddress ? 'Địa chỉ đã lưu · Dùng cho yêu cầu này' : form.orderAddress ? 'Địa chỉ đang dùng cho đơn này' : 'Lưu địa chỉ để dùng cho lần này và lần sau'}</Text></View>
         {addressLoading && <Text style={s.small}>Đang tải địa chỉ đã lưu…</Text>}
         {!!addressError && <View><Text accessibilityRole="alert" style={s.error}>{addressError}</Text><Action label="Thử tải lại" onPress={reloadAddress} /></View>}
         {form.originalDeliverBy && <Text style={s.small}>Ngày nhận hiện tại: {new Date(form.originalDeliverBy).toLocaleDateString('vi-VN')}. Chọn bên dưới nếu muốn đổi ngày.</Text>}<Text style={s.label}>Ngày nhận</Text><View style={s.row}><Choice label="Hôm nay" selected={!form.originalDeliverBy && form.day === 'today'} onPress={() => patch({ day: 'today', originalDeliverBy: null })} /><Choice label="Ngày mai" selected={!form.originalDeliverBy && form.day === 'tomorrow'} onPress={() => patch({ day: 'tomorrow', originalDeliverBy: null })} /></View>
@@ -159,11 +146,12 @@ export function CreateRequestScreen({ step }: { step: 1 | 2 | 3 | 4 }) {
     </ScrollView>
     <View style={s.footer}>{step === 3 && <View style={s.reviewFooterTotal}><Text style={s.small}>Tổng thanh toán</Text><Text style={s.reviewTotal}>{form.budget ? money(Number(form.budget) + Number(form.fee)) : 'Chưa xác định'}</Text></View>}{step === 4 && <Action label="Xem đơn hàng" onPress={() => router.replace('/(tabs)/orders')} />}<Pressable accessibilityRole="button" onPress={proceed} disabled={publishing} accessibilityState={{ disabled: publishing, busy: publishing }} style={[s.primary, publishing && { opacity: 0.6 }]}><Text style={s.primaryText}>{step === 4 ? 'Tạo yêu cầu khác' : publishing ? editId ? 'Đang lưu…' : 'Đang đăng…' : step === 3 ? requestLocked ? 'Thử lại' : editId ? 'Lưu thay đổi' : 'Xác nhận & đăng yêu cầu' : 'Tiếp tục →'}</Text></Pressable><Text style={[s.small, s.footerHint]}>{step === 1 ? 'Tiếp theo: địa chỉ, thời gian và chi phí' : step === 2 ? 'Tiếp theo: kiểm tra thông tin' : step === 4 ? 'Đã đăng thành công' : 'Kiểm tra thông tin trước khi lưu'}</Text></View>
   </KeyboardAvoidingView>
-  <Modal visible={!!item || addressOpen} transparent animationType="slide" onRequestClose={closeEditor}><View style={s.overlay}><SafeAreaView style={s.modalSafe}><KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={s.modal}>
-    <View style={s.sectionRow}><Text style={s.bold}>{item ? 'Thông tin món' : 'Địa chỉ nhận'}</Text><Action label="Đóng" onPress={closeEditor} /></View>
-    {item ? <><Field label="Tên món" value={item.name} onChangeText={name => setItem({ ...item, name })} maxLength={160} placeholder="Ví dụ: Thịt heo nạc vai" /><Field label="Số lượng" value={item.quantity} onChangeText={quantity => setItem({ ...item, quantity })} keyboardType="decimal-pad" /><Text style={s.label}>Đơn vị</Text><View style={s.wrap}>{units.map(unit => <Choice key={unit} label={unit} selected={!customUnit && item.unit === unit} onPress={() => { setCustomUnit(false); setItem({ ...item, unit }); }} />)}<Choice label="Khác" selected={customUnit} onPress={() => { setCustomUnit(true); if (!customUnit) setItem({ ...item, unit: '' }); }} /></View>{customUnit && <Field label="Đơn vị tự nhập" value={item.unit} onChangeText={unit => setItem({ ...item, unit })} placeholder="Ví dụ: nải, lon, mớ…" maxLength={30} />}<Field label="Dặn người mua · Không bắt buộc" value={item.note} onChangeText={note => setItem({ ...item, note })} multiline maxLength={500} /><View style={s.row}><Switch accessibilityLabel="Cho phép đề xuất loại tương tự" value={item.allowSubstitution} onValueChange={allowSubstitution => setItem({ ...item, allowSubstitution })} /><Text style={[s.body, s.flex]}>Có thể đề xuất loại tương tự nếu hết hàng (cần bạn xác nhận)</Text></View></> : addressOpen ? <View pointerEvents={savingAddress ? "none" : "auto"}><DeliveryAddressFields value={address} onChange={value => setAddress({ ...value, savedAddress: null })} /></View> : null}
-    {!!modalError && <Text accessibilityRole="alert" style={s.error}>{modalError}</Text>}<Pressable accessibilityRole="button" accessibilityState={{ disabled: savingAddress, busy: savingAddress }} disabled={savingAddress} style={[s.primary, savingAddress && { opacity: 0.6 }]} onPress={saveEditor}><Text style={s.primaryText}>{item ? 'Xong' : savingAddress ? 'Đang lưu…' : 'Lưu và dùng địa chỉ'}</Text></Pressable>
+  <Modal visible={!!item} transparent animationType="slide" onRequestClose={closeEditor}><View style={s.overlay}><SafeAreaView style={s.modalSafe}><KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={s.modal}>
+    <View style={s.sectionRow}><Text style={s.bold}>Thông tin món</Text><Action label="Đóng" onPress={closeEditor} /></View>
+    {item ? <><Field label="Tên món" value={item.name} onChangeText={name => setItem({ ...item, name })} maxLength={160} placeholder="Ví dụ: Thịt heo nạc vai" /><Field label="Số lượng" value={item.quantity} onChangeText={quantity => setItem({ ...item, quantity })} keyboardType="decimal-pad" /><Text style={s.label}>Đơn vị</Text><View style={s.wrap}>{units.map(unit => <Choice key={unit} label={unit} selected={!customUnit && item.unit === unit} onPress={() => { setCustomUnit(false); setItem({ ...item, unit }); }} />)}<Choice label="Khác" selected={customUnit} onPress={() => { setCustomUnit(true); if (!customUnit) setItem({ ...item, unit: '' }); }} /></View>{customUnit && <Field label="Đơn vị tự nhập" value={item.unit} onChangeText={unit => setItem({ ...item, unit })} placeholder="Ví dụ: nải, lon, mớ…" maxLength={30} />}<Field label="Dặn người mua · Không bắt buộc" value={item.note} onChangeText={note => setItem({ ...item, note })} multiline maxLength={500} /><View style={s.row}><Switch accessibilityLabel="Cho phép đề xuất loại tương tự" value={item.allowSubstitution} onValueChange={allowSubstitution => setItem({ ...item, allowSubstitution })} /><Text style={[s.body, s.flex]}>Có thể đề xuất loại tương tự nếu hết hàng (cần bạn xác nhận)</Text></View></> : null}
+    {!!modalError && <Text accessibilityRole="alert" style={s.error}>{modalError}</Text>}<Pressable accessibilityRole="button" style={s.primary} onPress={saveItem}><Text style={s.primaryText}>Xong</Text></Pressable>
   </ScrollView></KeyboardAvoidingView></SafeAreaView></View></Modal>
+  {addressOpen && <AddressPicker currentId={form.savedAddress?.id} onClose={() => setAddressOpen(false)} onSelect={selectDeliveryAddress} />}
   </SafeAreaView>;
 }
 const s = StyleSheet.create({

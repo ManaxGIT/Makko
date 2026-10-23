@@ -14,6 +14,7 @@ export type DeliveryAddress = {
 
 export function fromSavedAddress(saved: SavedAddress): DeliveryAddress {
   return {
+    orderAddress: null,
     coordinates: saved.latitude !== null && saved.longitude !== null ? { latitude: saved.latitude, longitude: saved.longitude } : null,
     phone: saved.recipientPhone,
     line1: saved.line1,

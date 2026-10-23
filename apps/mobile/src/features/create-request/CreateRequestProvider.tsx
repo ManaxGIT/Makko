@@ -1,7 +1,8 @@
 import { createContext, PropsWithChildren, useContext, useEffect, useRef, useState } from 'react';
-import { DeliveryAddress, fromSavedAddress, isDeliveryAddressComplete } from '@/features/addresses/addressForm';
-import { getPreferredAddress, saveAddress, SavedAddress } from '@/features/addresses/api';
-import { getHomeDashboard } from '@/features/home/api';
+import { DeliveryAddress, fromSavedAddress } from '@/features/addresses/addressForm';
+import type { SavedAddress } from '@/features/addresses/api';
+import { addressEntry } from '@/features/addresses/listCache';
+import { useAddresses } from '@/features/addresses/useAddresses';
 import { ApiError } from '@/lib/api';
 import { buildRequestBody, createAndPublishRequest, CreateRequestBody, EditRequestBody, getEditableRequest, updateRequest } from './api';
 import type { MealSuggestion, RecipeSnapshot } from '@/features/meals/api';
@@ -25,9 +26,8 @@ type FormContext = {
   startFromMeal: (meal: MealSuggestion) => void;
   addressLoading: boolean;
   addressError: string;
-  savingAddress: boolean;
   reloadAddress: () => void;
-  saveDeliveryAddress: (address: DeliveryAddress) => Promise<void>;
+  selectDeliveryAddress: (address: SavedAddress) => void;
   publishRequest: () => Promise<OrderActionResult>;
   publishing: boolean;
   requestLocked: boolean;
@@ -49,14 +49,13 @@ function AccountRequestProvider({ children, userId, editId }: PropsWithChildren<
   const editVersion = useRef('');
   const originalItemIds = useRef(new Set<string>());
   const [form, setForm] = useState(initialForm);
-  const [preferred, setPreferred] = useState<SavedAddress | null>(null);
-  const [addressLoading, setAddressLoading] = useState(!!userId);
-  const [addressError, setAddressError] = useState('');
-  const [savingAddress, setSavingAddress] = useState(false);
-  const [attempt, setAttempt] = useState(0);
+  const addresses = useAddresses();
+  const preferred = addresses.data?.find(a => a.isDefault) ?? addresses.data?.[0] ?? null;
+  const addressLoading = addresses.data === undefined && addresses.fetching;
+  const [selectionError, setSelectionError] = useState('');
+  const addressError = selectionError || addresses.error;
+  const initializedAddress = useRef(false);
   const alive = useRef(true);
-  const version = useRef(0);
-  const saveLock = useRef(false);
   const publishLock = useRef(false);
   const pendingSubmission = useRef<CreateRequestBody | EditRequestBody | null>(null);
   const [publishing, setPublishing] = useState(false);
@@ -67,22 +66,27 @@ function AccountRequestProvider({ children, userId, editId }: PropsWithChildren<
     return () => { alive.current = false; };
   }, []);
 
+  useEffect(() => { if (userId) void addresses.refresh(); }, [userId, addresses.refresh]);
   useEffect(() => {
-    if (!userId) return;
-    let active = true;
-    const requestVersion = ++version.current;
-    setAddressLoading(true); setAddressError('');
-    getPreferredAddress().then(saved => {
-      if (!active || requestVersion !== version.current) return;
-      setPreferred(saved);
-      if (saved && !editId && !pendingSubmission.current) setForm(current => ({ ...current, ...fromSavedAddress(saved) }));
-    }).catch(() => {
-      if (active && requestVersion === version.current) setAddressError('Không tải được địa chỉ đã lưu. Vui lòng thử lại.');
-    }).finally(() => {
-      if (active && requestVersion === version.current) setAddressLoading(false);
+    if (!addresses.data || pendingSubmission.current) return;
+    const rows = addresses.data;
+    const shouldInitialize = !initializedAddress.current && !editId;
+    if (form.savedAddress && !rows.some(a => a.id === form.savedAddress?.id)) setSelectionError('Địa chỉ đang chọn đã bị xóa. Vui lòng chọn lại.');
+    setForm(current => {
+      if (current.savedAddress) {
+        const saved = rows.find(a => a.id === current.savedAddress?.id);
+        if (!saved) {
+          return { ...current, savedAddress: null, orderAddress: null, phone: '', line1: '', province: null, ward: null, coordinates: null };
+        }
+        return { ...current, ...fromSavedAddress(saved) };
+      }
+      if (shouldInitialize) {
+        return preferred ? { ...current, ...fromSavedAddress(preferred), deliveryNote: preferred.deliveryNote ?? '' } : current;
+      }
+      return current;
     });
-    return () => { active = false; };
-  }, [userId, attempt, editId]);
+    initializedAddress.current = true;
+  }, [addresses.data, editId]);
 
   useEffect(() => {
     if (!editId || !userId) return;
@@ -104,37 +108,13 @@ function AccountRequestProvider({ children, userId, editId }: PropsWithChildren<
     return () => { active = false; };
   }, [editId, userId, editAttempt]);
 
-  async function saveDeliveryAddress(address: DeliveryAddress) {
-    if (!userId) throw new Error('Bạn cần đăng nhập để lưu địa chỉ.');
-    if (pendingSubmission.current) throw new Error('Vui lòng xác nhận kết quả đăng yêu cầu trước khi sửa địa chỉ.');
-    if (saveLock.current) throw new Error('Đang lưu địa chỉ, vui lòng chờ.');
-    if (!isDeliveryAddressComplete(address)) throw new Error('Vui lòng nhập đầy đủ địa chỉ và số điện thoại.');
-    if (address.savedAddress?.id === preferred?.id && preferred) {
-      setForm(current => ({ ...current, ...fromSavedAddress(preferred) }));
-      return;
-    }
-    if (!address.province || !address.ward) throw new Error('Vui lòng chọn lại tỉnh/thành và xã/phường.');
-    saveLock.current = true;
-    setSavingAddress(true);
-    ++version.current; // A late initial read must not overwrite the address being saved.
-    setAddressLoading(false);
-    try {
-      const { profile } = await getHomeDashboard({ nearbyLimit: 1 });
-      if (!alive.current || profile.id !== userId) throw new Error('Tài khoản đã thay đổi. Vui lòng thử lại.');
-      if (!profile.displayName.trim()) throw new Error('Vui lòng bổ sung tên trong hồ sơ tài khoản trước khi lưu.');
-      const saved = await saveAddress({
-        label: 'Nhà', recipientName: profile.displayName.trim(), recipientPhone: address.phone.trim(),
-        line1: address.line1.trim(), provinceCode: address.province.code, wardCode: address.ward.code,
-        latitude: address.coordinates?.latitude ?? null, longitude: address.coordinates?.longitude ?? null, isDefault: true,
-      }, userId);
-      if (!alive.current) return;
-      setPreferred(saved);
-      setForm(current => ({ ...current, ...fromSavedAddress(saved) }));
-      setAddressError('');
-    } finally {
-      saveLock.current = false;
-      if (alive.current) setSavingAddress(false);
-    }
+  function selectDeliveryAddress(address: SavedAddress) {
+    if (!userId || pendingSubmission.current) throw new Error('Vui lòng xác nhận kết quả đăng yêu cầu trước khi đổi địa chỉ.');
+    const saved = addressEntry(userId).snapshot.data?.find(a => a.id === address.id);
+    if (!saved) throw new Error('Địa chỉ đã thay đổi. Vui lòng tải lại danh sách.');
+    initializedAddress.current = true;
+    setSelectionError('');
+    setForm(current => ({ ...current, ...fromSavedAddress(saved), deliveryNote: saved.deliveryNote ?? '' }));
   }
 
   async function publishRequest(): Promise<OrderActionResult> {
@@ -142,7 +122,7 @@ function AccountRequestProvider({ children, userId, editId }: PropsWithChildren<
     if (editId && (editLoading || editError || !editVersion.current)) throw new Error('Vui lòng tải lại đơn trước khi lưu.');
     if (publishedRequest) return publishedRequest;
     if (publishLock.current) throw new Error('Đang đăng yêu cầu, vui lòng chờ.');
-    if (savingAddress) throw new Error('Vui lòng chờ lưu địa chỉ hoàn tất.');
+    if (addresses.mutating) throw new Error('Vui lòng chờ lưu địa chỉ hoàn tất.');
     if (!pendingSubmission.current) {
       // Non-secret per-submission identifier; the server scopes it to the authenticated owner.
       const key = `${Date.now().toString(36)}_${Math.random().toString(36).slice(2)}_${Math.random().toString(36).slice(2)}`;
@@ -181,12 +161,13 @@ function AccountRequestProvider({ children, userId, editId }: PropsWithChildren<
     reset: () => {
       if (publishLock.current) return;
       pendingSubmission.current = null;
-      setPublishedRequest(null); setRequestLocked(false);
-      setForm({ ...initialForm(), ...(preferred ? fromSavedAddress(preferred) : {}) });
+      setPublishedRequest(null); setRequestLocked(false); setSelectionError('');
+      initializedAddress.current = addresses.data !== undefined;
+      setForm({ ...initialForm(), ...(preferred ? { ...fromSavedAddress(preferred), deliveryNote: preferred.deliveryNote ?? '' } : {}) });
     },
     startFromMeal: meal => {
       if (!alive.current || !userId) throw new Error('Tài khoản đã thay đổi. Vui lòng thử lại.');
-      if (editId || savingAddress || publishLock.current || (pendingSubmission.current && !publishedRequest)) throw new Error('Vui lòng xử lý yêu cầu đang đăng trước khi chọn bữa mới.');
+      if (editId || addresses.mutating || publishLock.current || (pendingSubmission.current && !publishedRequest)) throw new Error('Vui lòng xử lý yêu cầu đang đăng trước khi chọn bữa mới.');
       pendingSubmission.current = null;
       setPublishedRequest(null); setRequestLocked(false);
       setForm(current => ({ ...current,
@@ -194,8 +175,8 @@ function AccountRequestProvider({ children, userId, editId }: PropsWithChildren<
         items: meal.ingredients.map((i, index) => ({ id: `meal-${Date.now()}-${index}`, name: i.name, quantity: String(i.quantity), unit: i.unit, note: i.note ?? '', allowSubstitution: false })),
       }));
     },
-    addressLoading, addressError, savingAddress, publishing, requestLocked, publishedRequest, publishRequest,
-    reloadAddress: () => setAttempt(n => n + 1), saveDeliveryAddress,
+    addressLoading, addressError, publishing, requestLocked, publishedRequest, publishRequest,
+    reloadAddress: () => { setSelectionError(''); void addresses.refresh(true); }, selectDeliveryAddress,
   }}>{children}</Context.Provider>;
 }
 export function useCreateRequest() {

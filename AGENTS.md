@@ -124,6 +124,20 @@ and the corresponding Supabase provider/configuration have been verified.
   Coordinate-dependent features are deferred; do not block posting on geolocation
   or fabricate distances. Preserve atomic creation/publication and owner checks.
 
+- User decision (2026-10-23): accounts may save multiple addresses and designate
+  one default. The first saved address becomes default; later additions do not
+  change it unless explicitly requested. Deleting the default while others remain
+  requires an owner-selected replacement in the same database transaction.
+- New requests start with the account default, falling back to the most recently
+  created address for legacy accounts without a default. Choosing another saved
+  address applies only to that request and must not change the account default.
+- The request address selector is a bottom popup over the delivery step. Do not
+  add a duplicate current-address summary inside it. Closing without confirmation
+  discards the temporary selection. Reuse the account address form for adding.
+- Account address edits/deletions never rewrite delivery snapshots on published
+  orders. If an address selected in an unpublished request is deleted, require
+  another explicit selection instead of silently substituting an address.
+
 ## Maps and distance
 
 - User decision (2026-10-23): Google Maps integration is temporarily paused.
