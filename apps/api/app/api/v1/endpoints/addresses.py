@@ -1,4 +1,5 @@
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
 
@@ -29,3 +30,39 @@ async def create_address(
     repository: Annotated[SupabaseRepository, Depends(get_repository)],
 ) -> Address:
     return await AddressService(repository).create_address(user, body)
+
+
+@router.patch('/{address_id}', response_model=list[Address], response_model_by_alias=True)
+async def update_address(
+    address_id: UUID,
+    body: CreateAddressBody,
+    user: Annotated[CurrentUser, Depends(get_current_user)],
+    repository: Annotated[SupabaseRepository, Depends(get_repository)],
+) -> list[Address]:
+    return await AddressService(repository).change_address(user, 'update_delivery_address', {
+        'p_address_id': str(address_id), 'p_address': body.model_dump(),
+    })
+
+
+@router.post('/{address_id}/default', response_model=list[Address], response_model_by_alias=True)
+async def set_default_address(
+    address_id: UUID,
+    user: Annotated[CurrentUser, Depends(get_current_user)],
+    repository: Annotated[SupabaseRepository, Depends(get_repository)],
+) -> list[Address]:
+    return await AddressService(repository).change_address(user, 'set_default_delivery_address', {
+        'p_address_id': str(address_id),
+    })
+
+
+@router.delete('/{address_id}', response_model=list[Address], response_model_by_alias=True)
+async def delete_address(
+    address_id: UUID,
+    user: Annotated[CurrentUser, Depends(get_current_user)],
+    repository: Annotated[SupabaseRepository, Depends(get_repository)],
+    replacement_address_id: UUID | None = None,
+) -> list[Address]:
+    return await AddressService(repository).change_address(user, 'delete_delivery_address', {
+        'p_address_id': str(address_id),
+        'p_replacement_id': str(replacement_address_id) if replacement_address_id else None,
+    })

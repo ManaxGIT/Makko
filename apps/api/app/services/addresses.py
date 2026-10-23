@@ -39,6 +39,22 @@ class AddressService:
             raise
         return Address(**result)
 
+    async def change_address(self, user: CurrentUser, function: str, payload: dict) -> list[Address]:
+        try:
+            rows = await self.repository.rpc_as_user(function, payload=payload, access_token=user.access_token)
+        except SupabaseError as error:
+            errors = {
+                'Address not found': (404, 'Địa chỉ không tồn tại hoặc không thuộc tài khoản của bạn.'),
+                'Invalid delivery address': (422, 'Địa chỉ hoặc mã tỉnh/xã không hợp lệ.'),
+                'Default replacement required': (409, 'Vui lòng chọn địa chỉ mặc định thay thế.'),
+                'Active profile required': (403, 'Tài khoản không hoạt động.'),
+            }
+            if str(error) in errors:
+                status, detail = errors[str(error)]
+                raise HTTPException(status, detail) from error
+            raise
+        return [Address(**row) for row in rows]
+
     async def list_provinces(self) -> list[Province]:
         rows = await self.repository.select('provinces', params={
             'select': 'code,name,full_name', 'order': 'name.asc,code.asc',

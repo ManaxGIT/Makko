@@ -47,7 +47,7 @@ class Repository:
         self.calls.append((function, payload, access_token))
         if self.error:
             raise SupabaseError(self.error)
-        return deepcopy(ROW)
+        return deepcopy(ROW) if function == 'create_delivery_address' else [deepcopy(ROW)]
 
 
 @pytest.fixture
@@ -195,3 +195,42 @@ async def test_home_does_not_use_missing_coordinates_for_distance():
     assert result.location is not None and result.location.latitude is None
     assert service.list_explore_requests.call_args.kwargs['latitude'] is None
     assert service.list_explore_requests.call_args.kwargs['longitude'] is None
+
+
+@pytest.mark.parametrize('method,suffix,function', [
+    ('patch', '', 'update_delivery_address'),
+    ('post', '/default', 'set_default_delivery_address'),
+    ('delete', '', 'delete_delivery_address'),
+])
+def test_management_uses_verified_user_rpc_and_returns_authoritative_list(api, method, suffix, function):
+    client, repo, _ = api
+    path = f"/api/v1/addresses/{ROW['id']}{suffix}"
+    kwargs = {'json': BODY} if method == 'patch' else {}
+    if method == 'delete':
+        path += f"?replacement_address_id={USER.id}"
+    response = getattr(client, method)(path, **kwargs)
+    assert response.status_code == 200
+    assert response.json()[0]['recipientName'] == ROW['recipient_name']
+    name, payload, token = repo.calls[0]
+    assert name == function and token == USER.access_token
+    assert payload['p_address_id'] == ROW['id']
+    if method == 'delete':
+        assert payload['p_replacement_id'] == str(USER.id)
+
+
+@pytest.mark.parametrize('error,status', [('Address not found',404), ('Default replacement required',409),
+    ('Active profile required',403), ('Invalid delivery address',422)])
+def test_management_errors_are_exposed_without_leaking_other_owner_data(api, error, status):
+    client, repo, _ = api
+    repo.error = error
+    response = client.patch(f"/api/v1/addresses/{ROW['id']}", json=BODY)
+    assert response.status_code == status
+
+
+@pytest.mark.parametrize('method,suffix', [('patch',''),('post','/default'),('delete','')])
+def test_management_requires_auth(api, method, suffix):
+    client, repo, app = api
+    del app.dependency_overrides[get_current_user]
+    kwargs = {'json': BODY} if method == 'patch' else {}
+    assert getattr(client, method)(f"/api/v1/addresses/{ROW['id']}{suffix}", **kwargs).status_code == 401
+    assert not repo.calls

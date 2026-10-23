@@ -317,3 +317,24 @@ thêm công thức vào Explore hay Chi tiết yêu cầu. Database có RLS ch�
 
 Migration: `20261023085134_order_recipe_snapshots.sql`. Kiểm tra giao dịch và
 quyền bằng `supabase/tests/order_recipes.sql`; mọi dữ liệu test được rollback.
+
+### Quản lý sổ địa chỉ
+
+`GET /api/v1/addresses` tiếp tục phân trang và xếp mặc định trước, sau đó mới nhất.
+`POST /api/v1/addresses` vẫn trả một địa chỉ; địa chỉ đầu tiên của tài khoản tự làm
+mặc định. Thêm địa chỉ khác không tự thay mặc định trừ khi `isDefault=true`.
+
+- `PATCH /api/v1/addresses/{id}`: sửa bằng cùng DTO với tạo mới.
+- `POST /api/v1/addresses/{id}/default`: đặt mặc định.
+- `DELETE /api/v1/addresses/{id}?replacement_address_id={id}`: xóa; cần địa chỉ
+  thay thế thuộc cùng tài khoản khi xóa mặc định và còn địa chỉ khác.
+
+Ba thao tác quản lý trả danh sách địa chỉ còn lại từ cùng giao dịch để mobile cập
+nhật cache mà không tải lại toàn bộ. RPC dùng token của người dùng, RLS và khóa
+profile chủ sở hữu giống tạo địa chỉ/đăng đơn; tên tỉnh/phường lấy từ danh mục.
+Sửa không tự bỏ mặc định của địa chỉ đang là mặc định. Không backfill mặc định
+cho tài khoản cũ; khi chưa có mặc định, mobile ưu tiên địa chỉ được tạo gần nhất.
+Xóa chỉ làm null liên kết nguồn của đơn, không thay bản chốt địa chỉ giao hàng.
+
+Migration `20261023132806_saved_address_management.sql`; kiểm tra rollback với
+`supabase/tests/saved_address_management.sql` dùng tài khoản và đơn tổng hợp.
