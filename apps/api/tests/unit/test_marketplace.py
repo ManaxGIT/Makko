@@ -297,3 +297,160 @@ async def test_home_does_not_use_saved_address_as_current_gps():
     assert without_gps.nearby_requests[0].distance_meters is None
     with_gps = await service.get_home_dashboard(USER_ID, nearby_limit=5, latitude=10.781, longitude=106.70)
     assert with_gps.nearby_requests[0].distance_meters == pytest.approx(111.2, abs=1)
+
+
+@pytest.mark.parametrize('query,expected', [
+    ('TRAI CAY', True), ('  cam   sanh  ', True), ('co lan', True),
+    ('sanh lan', True), ('sa\u0300nh', True), ('cam chuoi', False),
+    ('   ', True), ('%_', False),
+])
+async def test_explore_vietnamese_search(query, expected):
+    rows = await MarketplaceService(FakeRepository()).list_explore_requests(
+        USER_ID, query=query, latitude=None, longitude=None, limit=20, radius_meters=3000,
+    )
+    assert bool(rows) is expected
+
+
+async def test_explore_search_description_and_vietnamese_d():
+    class DescriptionRepository(FakeRepository):
+        async def select(self, table, *, params):
+            rows = await super().select(table, params=params)
+            if table == 'shopping_requests':
+                rows[0]['description'] = 'Đồ ăn cho bữa tối'
+            return rows
+    rows = await MarketplaceService(DescriptionRepository()).list_explore_requests(
+        USER_ID, query='DO AN toi', latitude=None, longitude=None, limit=20, radius_meters=3000,
+    )
+    assert len(rows) == 1
+
+
+async def test_explore_search_keeps_radius_and_active_profile_checks():
+    assert await MarketplaceService(FakeRepository()).list_explore_requests(
+        USER_ID, query='cam sanh', latitude=11.0, longitude=106.70, limit=20, radius_meters=3000,
+    ) == []
+
+    class InactiveRepository(FakeRepository):
+        async def select(self, table, *, params):
+            rows = await super().select(table, params=params)
+            if table == 'profiles':
+                rows[0]['account_status'] = 'suspended'
+            return rows
+    assert await MarketplaceService(InactiveRepository()).list_explore_requests(
+        USER_ID, query='cam', latitude=None, longitude=None, limit=20, radius_meters=3000,
+    ) == []
+
+
+async def test_explore_finds_matches_beyond_first_hundred_orders():
+    class PagedRepository(FakeRepository):
+        def __init__(self):
+            self.offsets = []
+
+        async def select(self, table, *, params):
+            rows = await super().select(table, params=params)
+            if table == 'shopping_requests':
+                self.offsets.append(int(params['offset']))
+                assert params['status'] == 'eq.open'
+                assert params['customer_id'] == f'neq.{USER_ID}'
+                if params['offset'] == '0':
+                    return [{**rows[0], 'id': str(UUID(int=index + 1)), 'title': 'Không phù hợp'}
+                            for index in range(100)]
+                return [{**rows[0], 'title': 'Đơn cần tìm'}]
+            return rows
+
+    repository = PagedRepository()
+    rows = await MarketplaceService(repository).list_explore_requests(
+        USER_ID, query='don tim', latitude=None, longitude=None, limit=1, radius_meters=3000,
+    )
+    assert [str(row.id) for row in rows] == [REQUEST_ID]
+    assert repository.offsets == [0, 100]
+
+
+class AreaRepository(FakeRepository):
+    async def select_one(self, table, *, params):
+        if table == 'provinces':
+            if params['code'] == 'eq.48':
+                return {'code': '48', 'name': 'Đà Nẵng', 'full_name': 'Thành phố Đà Nẵng'}
+            return None
+        if table == 'wards':
+            if params['code'] == 'eq.20194' and params['province_code'] == 'eq.48':
+                return {'code': '20194', 'name': 'Hải Châu', 'full_name': 'Phường Hải Châu'}
+            return None
+        return await super().select_one(table, params=params)
+
+    async def select(self, table, *, params):
+        rows = await super().select(table, params=params)
+        if table == 'shopping_requests':
+            base = rows[0]
+            return [
+                {**base, 'id': str(UUID(int=1)), 'delivery_city': 'Thành phố Đà Nẵng',
+                 'delivery_ward': 'Phường Hải Châu', 'delivery_latitude': None, 'delivery_longitude': None},
+                {**base, 'id': str(UUID(int=2)), 'delivery_city': 'Đà Nẵng',
+                 'delivery_ward': 'Thanh Khê'},
+                {**base, 'id': str(UUID(int=3)), 'delivery_city': 'Đà Nẵng',
+                 'delivery_ward': 'Hải Châu'},
+                {**base, 'id': str(UUID(int=4)), 'delivery_city': 'Hà Nội',
+                 'delivery_ward': 'Hải Châu'},
+            ]
+        return rows
+
+
+async def test_explore_area_uses_delivery_snapshot_without_gps_or_radius():
+    service = MarketplaceService(AreaRepository())
+    rows = await service.list_explore_requests(
+        USER_ID, query=None, latitude=21.0, longitude=105.8,
+        limit=20, radius_meters=3000, province_code='48',
+    )
+    assert {str(row.id)[-1] for row in rows} == {'1', '2', '3'}
+    assert any(row.distance_meters is None for row in rows)
+    rows = await service.list_explore_requests(
+        USER_ID, query=None, latitude=None, longitude=None,
+        limit=20, radius_meters=3000, province_code='48', ward_code='20194',
+    )
+    assert [str(row.id)[-1] for row in rows] == ['1', '3']
+    assert all(row.distance_meters is None for row in rows)
+
+
+async def test_explore_area_and_keyword_combine_before_result_limit():
+    rows = await MarketplaceService(AreaRepository()).list_explore_requests(
+        USER_ID, query='trai cay', latitude=None, longitude=None,
+        limit=1, radius_meters=3000, province_code='48', ward_code='20194',
+    )
+    assert [str(row.id)[-1] for row in rows] == ['1']
+    assert await MarketplaceService(AreaRepository()).list_explore_requests(
+        USER_ID, query='khong ton tai', latitude=None, longitude=None,
+        limit=20, radius_meters=3000, province_code='48',
+    ) == []
+
+
+@pytest.mark.parametrize('province,ward', [(None, '20194'), ('99', None), ('48', '99999')])
+async def test_explore_rejects_invalid_administrative_selection(province, ward):
+    from fastapi import HTTPException
+    with pytest.raises(HTTPException) as error:
+        await MarketplaceService(AreaRepository()).list_explore_requests(
+            USER_ID, query=None, latitude=None, longitude=None, limit=20,
+            radius_meters=3000, province_code=province, ward_code=ward,
+        )
+    assert error.value.status_code == 422
+
+
+def test_explore_http_area_contract_and_validation():
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from app.api.v1.endpoints.explore import router
+    from app.dependencies.auth import get_current_user
+    from app.dependencies.repositories import get_repository
+    from app.models.user import CurrentUser
+    app = FastAPI()
+    app.include_router(router, prefix='/api/v1')
+    app.dependency_overrides[get_current_user] = lambda: CurrentUser(USER_ID, 'test-token')
+    app.dependency_overrides[get_repository] = lambda: AreaRepository()
+    with TestClient(app) as client:
+        result = client.get('/api/v1/explore', params={
+            'province_code': '48', 'ward_code': '20194', 'query': 'trai cay',
+            'latitude': 21.0, 'longitude': 105.8,
+        })
+        assert result.status_code == 200
+        assert {row['deliveryWard'] for row in result.json()} == {'Phường Hải Châu', 'Hải Châu'}
+        assert client.get('/api/v1/explore?province_code=abc').status_code == 422
+        assert client.get('/api/v1/explore?ward_code=20194').status_code == 422
+        assert client.get('/api/v1/explore?province_code=48&ward_code=99999').status_code == 422

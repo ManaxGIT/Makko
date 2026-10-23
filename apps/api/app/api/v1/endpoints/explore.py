@@ -21,11 +21,14 @@ async def list_explore_requests(
     latitude: Annotated[float | None, Query(ge=-90, le=90)] = None,
     longitude: Annotated[float | None, Query(ge=-180, le=180)] = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
+    province_code: Annotated[str | None, Query(pattern=r'^\d{2}$')] = None,
+    ward_code: Annotated[str | None, Query(pattern=r'^\d{5}$')] = None,
     radius_meters: Annotated[int | None, Query(ge=100, le=50_000)] = 3_000,
 ) -> list[ExploreRequest]:
     return await MarketplaceService(repository).list_explore_requests(
         user.id, query=query, latitude=latitude, longitude=longitude,
         limit=limit, radius_meters=radius_meters,
+        province_code=province_code, ward_code=ward_code,
     )
 
 

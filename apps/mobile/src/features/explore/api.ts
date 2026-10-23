@@ -38,6 +38,8 @@ export type ListExploreRequestsParams = {
   latitude?: number;
   longitude?: number;
   limit?: number;
+  provinceCode?: string;
+  wardCode?: string;
 };
 
 export async function listExploreRequests({
@@ -45,9 +47,12 @@ export async function listExploreRequests({
   latitude,
   longitude,
   limit = 20,
+  provinceCode,
+  wardCode,
 }: ListExploreRequestsParams = {}): Promise<ExploreRequest[]> {
   return apiGet<ExploreRequest[]>('/api/v1/explore', {
     query: query?.trim(), latitude, longitude, limit,
+    province_code: provinceCode, ward_code: wardCode,
   });
 }
 

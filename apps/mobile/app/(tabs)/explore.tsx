@@ -8,24 +8,16 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ExploreRequest, listExploreRequests } from '@/features/explore/api';
 import { clearUnavailableExploreRequests, getUnavailableExploreRequestIds } from '@/features/explore/unavailableRequests';
 import { useAuth } from '@/features/auth/AuthProvider';
-import { useCurrentLocation } from '@/features/location/LocationProvider';
+import { ExploreAreaFilter, ExploreArea } from '@/features/explore/ExploreAreaFilter';
+import { useNearbyLocation } from '@/features/location/LocationProvider';
 import { colors } from '@/theme/colors';
 import { fontFamilies, fontSizes, letterSpacing, lineHeights } from '@/theme/typography';
 
 type SymbolName = ComponentProps<typeof SymbolView>['name'];
-type Category = 'Tất cả' | 'Rau củ' | 'Thịt cá' | 'Trái cây' | 'Đồ khô';
 type Request = {
   id: string; owner: string; initials: string; rating: string; distance: string;
-  deadline: string; title: string; category: Exclude<Category, 'Tất cả'>;
+  deadline: string; title: string; address: string;
   items: string[]; extra: number; fee: string; avatarColor: string; avatarText: string;
-};
-
-const categories: Category[] = ['Tất cả', 'Rau củ', 'Thịt cá', 'Trái cây', 'Đồ khô'];
-const categoryKeywords: Record<Exclude<Category, 'Tất cả'>, string[]> = {
-  'Rau củ': ['rau', 'củ', 'cải', 'hành', 'khoai'],
-  'Thịt cá': ['thịt', 'cá', 'tôm', 'gà', 'bò', 'heo'],
-  'Trái cây': ['trái cây', 'cam', 'chuối', 'táo', 'xoài'],
-  'Đồ khô': ['gạo', 'đậu', 'mì', 'bún', 'đồ khô'],
 };
 
 function formatDistance(distance: number | null) {
@@ -46,12 +38,6 @@ function formatQuantity(quantity: number) {
   return Number.isInteger(quantity) ? String(quantity) : quantity.toLocaleString('vi-VN');
 }
 
-function getCategory(request: ExploreRequest): Exclude<Category, 'Tất cả'> {
-  const haystack = request.items.map((item) => item.name).join(' ').toLocaleLowerCase('vi');
-  return (Object.entries(categoryKeywords).find(([, words]) => words.some((word) => haystack.includes(word)))?.[0]
-    ?? 'Đồ khô') as Exclude<Category, 'Tất cả'>;
-}
-
 function toCardRequest(request: ExploreRequest): Request {
   const initials = request.ownerDisplayName.split(/\s+/).filter(Boolean).slice(-2).map((part) => part[0]).join('').toLocaleUpperCase('vi');
   const palette = [
@@ -66,7 +52,7 @@ function toCardRequest(request: ExploreRequest): Request {
     distance: formatDistance(request.distanceMeters),
     deadline: formatDeadline(request.deliverBy),
     title: request.title,
-    category: getCategory(request),
+    address: [request.deliveryWard, request.deliveryCity].filter(Boolean).join(', '),
     items: request.items.slice(0, 2).map((item) => `${item.name} ${formatQuantity(item.quantity)} ${item.unit}`),
     extra: Math.max(0, request.itemCount - 2),
     fee: `${request.deliveryFee.toLocaleString('vi-VN')}đ`,
@@ -101,6 +87,7 @@ function RequestCard({ request }: { request: Request }) {
 
       <Pressable accessibilityRole="button" onPress={openRequest} style={({ pressed }) => pressed && styles.pressed}>
         <Text style={styles.cardTitle}>{request.title}</Text>
+        <Text style={styles.cardAddress}>{request.address}</Text>
         <View style={styles.itemList}>
           {request.items.map((item) => <View key={item} style={styles.itemChip}><Text style={styles.itemText}>{item}</Text></View>)}
           {request.extra > 0 && <View style={styles.itemChip}><Text style={styles.itemText}>＋ {request.extra} món</Text></View>}
@@ -124,8 +111,12 @@ export default function ExploreScreen() {
 }
 
 function AccountExploreScreen() {
-  const { coordinates, locating, error: locationError, locate } = useCurrentLocation();
-  const [category, setCategory] = useState<Category>('Tất cả');
+  const { coordinates, locating, error: locationError, locate } = useNearbyLocation();
+  const [mode, setMode] = useState<'nearby' | 'area'>('nearby');
+  const [area, setArea] = useState<ExploreArea>({ province: null, ward: null });
+  const provinceCode = mode === 'area' ? area.province?.code : undefined;
+  const wardCode = mode === 'area' ? area.ward?.code : undefined;
+  const ready = mode === 'nearby' ? !!coordinates : !!provinceCode;
   const [query, setQuery] = useState('');
   const [nearest, setNearest] = useState(true);
   const [requests, setRequests] = useState<ExploreRequest[]>([]);
@@ -139,12 +130,13 @@ function AccountExploreScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [pullRefreshing, setPullRefreshing] = useState(false);
   const loadRequests = useCallback(async (searchQuery: string) => {
+    if (!ready) { setLoading(false); setRefreshing(false); return; }
     const version = ++searchVersion.current;
     if (!loaded.current) setLoading(true);
     setRefreshing(true);
     setError(null);
     try {
-      const params = { query: searchQuery, ...(coordinates ?? {}) };
+      const params = { query: searchQuery.trim(), ...(coordinates ?? {}), provinceCode, wardCode };
       const key = JSON.stringify(params);
       let pending = pendingReads.current.get(key);
       if (!pending) {
@@ -162,7 +154,7 @@ function AccountExploreScreen() {
     } finally {
       if (searchVersion.current === version) { setLoading(false); setRefreshing(false); }
     }
-  }, [coordinates]);
+  }, [coordinates, provinceCode, wardCode, ready]);
 
   useEffect(() => {
     const timer = setTimeout(() => { void loadRequests(query); }, 300);
@@ -183,14 +175,13 @@ function AccountExploreScreen() {
   const visibleRequests = useMemo(() => {
     const cards = requests
       .filter((request) => !unavailableRequestIds.has(request.id))
-      .map(toCardRequest)
-      .filter((request) => category === 'Tất cả' || request.category === category);
+      .map(toCardRequest);
     return nearest ? cards : cards.sort((a, b) => {
       const first = requests.find((request) => request.id === a.id)?.publishedAt ?? '';
       const second = requests.find((request) => request.id === b.id)?.publishedAt ?? '';
       return second.localeCompare(first);
     });
-  }, [category, nearest, requests, unavailableRequestIds]);
+  }, [nearest, requests, unavailableRequestIds]);
 
   return (
     <SafeAreaView edges={['top']} style={styles.safeArea}>
@@ -203,43 +194,30 @@ function AccountExploreScreen() {
           </Pressable>
         </View>
 
-        <Pressable accessibilityRole="button" disabled={locating} onPress={() => void locate()} style={styles.locationCard}>
-          <View style={styles.locationIcon}><Icon color={colors.coral} name={{ ios: 'location.fill', android: 'location_on', web: 'location_on' }} size={18} /></View>
-          <View style={styles.locationCopy}><Text style={styles.locationLabel}>KHU VỰC ĐANG TÌM</Text><Text style={styles.location}>{locating ? 'Đang lấy vị trí…' : coordinates ? 'Vị trí hiện tại · trong 3km' : 'Bật vị trí để tìm đơn gần bạn'}</Text></View>
-          <Icon color={colors.muted} name={{ ios: 'chevron.right', android: 'chevron_right', web: 'chevron_right' }} size={16} />
-        </Pressable>
-
-        {!!locationError && <Text accessibilityRole="alert" style={styles.emptyText}>{locationError}</Text>}
-        {coordinates && <Text style={styles.emptyText}>Khoảng cách ước tính theo đường chim bay</Text>}
         <View style={styles.searchBox}>
           <Icon name={{ ios: 'magnifyingglass', android: 'search', web: 'search' }} size={19} />
-          <TextInput accessibilityLabel="Tìm yêu cầu" onChangeText={setQuery} placeholder="Tìm món đồ hoặc người đăng..." placeholderTextColor={colors.mutedLight} style={styles.searchInput} value={query} />
-          {query ? <Pressable accessibilityLabel="Xóa tìm kiếm" onPress={() => setQuery('')}><Icon color={colors.muted} name={{ ios: 'xmark.circle.fill', android: 'cancel', web: 'cancel' }} size={18} /></Pressable> : <View style={styles.filterIcon}><Icon color={colors.coral} name={{ ios: 'slider.horizontal.3', android: 'tune', web: 'tune' }} size={16} /></View>}
+          <TextInput accessibilityLabel="Tìm món, nguyên liệu hoặc tiêu đề" autoCorrect={false} maxLength={120} returnKeyType="search" onChangeText={setQuery} placeholder="Thêm món, nguyên liệu cần tìm…" placeholderTextColor={colors.mutedLight} style={styles.searchInput} value={query} />
+          {!!query && <Pressable accessibilityRole="button" accessibilityLabel="Xóa tìm kiếm" onPress={() => setQuery('')} style={styles.clearSearch}><Icon color={colors.muted} name={{ ios: 'xmark.circle.fill', android: 'cancel', web: 'cancel' }} size={18} /></Pressable>}
         </View>
-
-        <ScrollView contentContainerStyle={styles.categories} horizontal showsHorizontalScrollIndicator={false}>
-          {categories.map((item) => {
-            const selected = item === category;
-            return <Pressable accessibilityRole="button" accessibilityState={{ selected }} key={item} onPress={() => setCategory(item)} style={({ pressed }) => [styles.categoryChip, selected && styles.activeCategoryChip, pressed && styles.pressed]}><Text style={[styles.categoryText, selected && styles.activeCategoryText]}>{item}</Text></Pressable>;
-          })}
-        </ScrollView>
+        <Text style={styles.searchHint}>Có thể để trống từ khóa để xem đơn trong khu vực.</Text>
+        <ExploreAreaFilter mode={mode} onModeChange={setMode} value={area} onChange={setArea} locating={locating} hasCoordinates={!!coordinates} locate={() => void locate()} locationError={locationError} />
 
         <View style={styles.resultsHeader}>
-          <View><Text style={styles.resultTitle}>Yêu cầu gần bạn</Text><Text style={styles.resultCount}>{visibleRequests.length} yêu cầu phù hợp</Text></View>
+          <View><Text style={styles.resultTitle}>{query.trim() ? 'Kết quả tìm kiếm' : mode === 'area' ? 'Yêu cầu trong khu vực' : 'Yêu cầu gần bạn'}</Text><Text style={styles.resultCount}>{!ready ? 'Chọn vị trí hoặc khu vực để tìm đơn' : refreshing ? 'Đang cập nhật kết quả…' : `${visibleRequests.length} yêu cầu phù hợp`}</Text></View>
           <View style={styles.resultActions}>
-            <Pressable accessibilityLabel="Tải lại danh sách yêu cầu" accessibilityRole="button" disabled={refreshing} onPress={refreshRequests} style={({ pressed }) => [styles.reloadButton, (pressed || loading) && styles.pressed]}>
+            <Pressable accessibilityLabel="Tải lại danh sách yêu cầu" accessibilityRole="button" disabled={refreshing || !ready} onPress={refreshRequests} style={({ pressed }) => [styles.reloadButton, (pressed || loading) && styles.pressed]}>
               {refreshing ? <ActivityIndicator color={colors.coral} size="small" /> : <Icon color={colors.coral} name={{ ios: 'arrow.clockwise', android: 'refresh', web: 'refresh' }} size={15} />}
             </Pressable>
-            <Pressable accessibilityRole="button" onPress={() => setNearest((value) => !value)} style={({ pressed }) => [styles.sortButton, pressed && styles.pressed]}>
+            <Pressable accessibilityRole="button" disabled={!coordinates} onPress={() => setNearest((value) => !value)} style={({ pressed }) => [styles.sortButton, pressed && styles.pressed]}>
               <Icon color={colors.coral} name={{ ios: 'arrow.up.arrow.down', android: 'sort', web: 'sort' }} size={14} />
-              <Text style={styles.sortText}>{nearest ? 'Gần nhất' : 'Mới nhất'}</Text>
+              <Text style={styles.sortText}>{nearest && coordinates ? 'Gần nhất' : 'Mới nhất'}</Text>
             </Pressable>
           </View>
         </View>
 
-        {error && loaded.current && <Text accessibilityRole="alert" style={styles.emptyText}>{error}</Text>}
+        {ready && error && loaded.current && <Text accessibilityRole="alert" style={styles.emptyText}>{error}</Text>}
         <View style={styles.list}>
-          {loading ? <View style={styles.loadingState}><ActivityIndicator color={colors.coral} /><Text style={styles.emptyText}>Đang tìm yêu cầu quanh bạn...</Text></View> : error && !loaded.current ? (
+          {!ready ? <View style={styles.emptyState}><Text style={styles.emptyTitle}>{mode === 'nearby' ? 'Tìm đơn gần bạn' : 'Bạn muốn tìm đơn ở đâu?'}</Text><Text style={styles.emptyText}>{mode === 'nearby' ? 'Bật vị trí hiện tại hoặc chọn khu vực để xem đơn phù hợp.' : 'Chọn tỉnh / thành phố ở trên. Bạn có thể chọn thêm xã / phường để thu hẹp kết quả.'}</Text></View> : loading ? <View style={styles.loadingState}><ActivityIndicator color={colors.coral} /><Text style={styles.emptyText}>Đang tìm yêu cầu quanh bạn...</Text></View> : error && !loaded.current ? (
             <View style={styles.emptyState}>
               <Text style={styles.emptyTitle}>Không thể tải yêu cầu</Text>
               <Text style={styles.emptyText}>{error}</Text>
@@ -249,7 +227,8 @@ function AccountExploreScreen() {
             <View style={styles.emptyState}>
               <View style={styles.emptyIcon}><Icon color={colors.coral} name={{ ios: 'magnifyingglass', android: 'search', web: 'search' }} size={24} /></View>
               <Text style={styles.emptyTitle}>Chưa tìm thấy yêu cầu</Text>
-              <Text style={styles.emptyText}>Thử đổi từ khóa hoặc chọn một danh mục khác nhé.</Text>
+              <Text style={styles.emptyText}>Thử đổi từ khóa hoặc khu vực đang tìm nhé.</Text>
+              {!!query.trim() && <Pressable accessibilityRole="button" onPress={() => setQuery('')} style={styles.retryButton}><Text style={styles.retryText}>Xóa từ khóa</Text></Pressable>}
             </View>
           )}
         </View>
@@ -267,15 +246,11 @@ const styles = StyleSheet.create({
   heading: { color: colors.text, fontFamily: fontFamilies.display, fontSize: fontSizes.pageTitle, lineHeight: lineHeights.pageTitle, marginTop: 4 },
   iconButton: { alignItems: 'center', backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 12, borderWidth: 1, height: 42, justifyContent: 'center', position: 'relative', width: 42 },
   notificationDot: { backgroundColor: colors.coral, borderColor: colors.surface, borderRadius: 5, borderWidth: 2, height: 9, position: 'absolute', right: 8, top: 7, width: 9 },
-  locationCard: { alignItems: 'center', backgroundColor: colors.cream, borderRadius: 15, flexDirection: 'row', marginHorizontal: 20, padding: 12 },
-  locationIcon: { alignItems: 'center', backgroundColor: colors.surface, borderRadius: 10, height: 36, justifyContent: 'center', width: 36 },
-  locationCopy: { flex: 1, gap: 2, marginLeft: 10 }, locationLabel: { color: colors.brown, fontFamily: fontFamilies.bodyExtraBold, fontSize: fontSizes.caption, letterSpacing: letterSpacing.label },
-  location: { color: colors.text, fontFamily: fontFamilies.bodyBold, fontSize: fontSizes.bodySmall, lineHeight: lineHeights.bodySmall },
-  searchBox: { alignItems: 'center', backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 15, borderWidth: 1, flexDirection: 'row', height: 49, marginHorizontal: 20, marginTop: 14, paddingHorizontal: 14 },
+  searchBox: { alignItems: 'center', backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 15, borderWidth: 1, flexDirection: 'row', height: 49, marginHorizontal: 20, marginTop: 0, paddingHorizontal: 14 },
   searchInput: { color: colors.text, flex: 1, fontFamily: fontFamilies.body, fontSize: fontSizes.body, marginLeft: 9, paddingVertical: 0 },
-  filterIcon: { alignItems: 'center', backgroundColor: colors.cream, borderRadius: 8, height: 29, justifyContent: 'center', width: 29 },
-  categories: { gap: 7, paddingHorizontal: 20, paddingVertical: 14 }, categoryChip: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 99, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 8 },
-  activeCategoryChip: { backgroundColor: colors.forest, borderColor: colors.forest }, categoryText: { color: colors.text, fontFamily: fontFamilies.body, fontSize: fontSizes.bodySmall }, activeCategoryText: { color: colors.surface, fontFamily: fontFamilies.bodyBold },
+  clearSearch: { minWidth: 40, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+  searchHint: { color: colors.muted, fontFamily: fontFamilies.body, fontSize: fontSizes.caption, lineHeight: lineHeights.caption, marginHorizontal: 20, marginTop: 8, marginBottom: 14 },
+  cardAddress: { color: colors.forest, fontFamily: fontFamilies.body, fontSize: fontSizes.caption, lineHeight: lineHeights.caption, marginBottom: 8 },
   resultsHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', paddingBottom: 10, paddingHorizontal: 20, paddingTop: 3 },
   resultTitle: { color: colors.text, fontFamily: fontFamilies.bodyBold, fontSize: fontSizes.bodyLarge, lineHeight: lineHeights.bodyLarge }, resultCount: { color: colors.muted, fontFamily: fontFamilies.body, fontSize: fontSizes.caption, lineHeight: lineHeights.caption, marginTop: 2 },
   resultActions: { alignItems: 'center', flexDirection: 'row', gap: 7 },

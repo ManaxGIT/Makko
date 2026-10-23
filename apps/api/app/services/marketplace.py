@@ -1,4 +1,5 @@
 import math
+import unicodedata
 from collections import Counter
 from typing import Any
 from uuid import UUID
@@ -17,6 +18,13 @@ from app.schemas.orders import (
     OrderSummary,
     OrderTracking,
 )
+
+
+def normalize_search_text(value: str) -> str:
+    decomposed = unicodedata.normalize("NFD", value.casefold().replace("đ", "d"))
+    return " ".join("".join(
+        character for character in decomposed if not unicodedata.combining(character)
+    ).split())
 
 
 def haversine_meters(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -45,64 +53,98 @@ class MarketplaceService:
         longitude: float | None,
         limit: int,
         radius_meters: int | None,
+        province_code: str | None = None,
+        ward_code: str | None = None,
     ) -> list[ExploreRequest]:
-        requests = await self.repository.select(
-            "shopping_requests",
-            params={
-                "select": "id,customer_id,title,description,currency,estimated_items_total,delivery_fee,deliver_by,delivery_ward,delivery_district,delivery_city,delivery_latitude,delivery_longitude,published_at,created_at",
-                "status": "eq.open",
-                "customer_id": f"neq.{user_id}",
-                "order": "published_at.desc.nullslast,created_at.desc",
-                "limit": "100",
-            },
-        )
-        request_ids = [row["id"] for row in requests]
-        customer_ids = sorted({row["customer_id"] for row in requests})
-        profiles = await self._profiles(customer_ids)
-        items = await self._items(request_ids)
-        needle = (query or "").strip().casefold()
+        if ward_code and not province_code:
+            raise HTTPException(422, 'Chọn tỉnh/thành trước khi chọn xã/phường.')
+        province_names: set[str] = set()
+        ward_names: set[str] = set()
+        if province_code:
+            province = await self.repository.select_one('provinces', params={
+                'select': 'code,name,full_name', 'code': f'eq.{province_code}',
+            })
+            if province is None:
+                raise HTTPException(422, 'Tỉnh/thành không hợp lệ.')
+            province_names = {normalize_search_text(province[key]) for key in ('name', 'full_name')}
+            if ward_code:
+                ward = await self.repository.select_one('wards', params={
+                    'select': 'code,name,full_name', 'code': f'eq.{ward_code}',
+                    'province_code': f'eq.{province_code}',
+                })
+                if ward is None:
+                    raise HTTPException(422, 'Xã/phường không thuộc tỉnh/thành đã chọn.')
+                ward_names = {normalize_search_text(ward[key]) for key in ('name', 'full_name')}
+        terms = normalize_search_text(query or "").split()
         results: list[ExploreRequest] = []
+        offset = 0
+        while True:
+            requests = await self.repository.select(
+                "shopping_requests",
+                params={
+                    "select": "id,customer_id,title,description,currency,estimated_items_total,delivery_fee,deliver_by,delivery_ward,delivery_district,delivery_city,delivery_latitude,delivery_longitude,published_at,created_at",
+                    "status": "eq.open",
+                    "customer_id": f"neq.{user_id}",
+                    "order": "published_at.desc.nullslast,created_at.desc,id.desc",
+                    "limit": "100",
+                    "offset": str(offset),
+                },
+            )
+            if not requests:
+                break
+            request_ids = [row["id"] for row in requests]
+            customer_ids = sorted({row["customer_id"] for row in requests})
+            profiles = await self._profiles(customer_ids)
+            items = await self._items(request_ids)
 
-        for request in requests:
-            profile = profiles.get(request["customer_id"])
-            if profile is None or profile.get("account_status") != "active":
-                continue
-            request_items = items.get(request["id"], [])
-            searchable = " ".join([
-                str(request["title"]), str(request.get("description") or ""),
-                str(profile["display_name"]),
-                *(str(item["name"]) for item in request_items),
-            ]).casefold()
-            if needle and needle not in searchable:
-                continue
-
-            distance = None
-            if (latitude is not None and longitude is not None
-                    and request.get("delivery_latitude") is not None
-                    and request.get("delivery_longitude") is not None):
-                distance = haversine_meters(
-                    latitude, longitude,
-                    float(request["delivery_latitude"]), float(request["delivery_longitude"]),
-                )
-            if latitude is not None and longitude is not None and radius_meters is not None:
-                if distance is None or distance > radius_meters:
+            for request in requests:
+                profile = profiles.get(request["customer_id"])
+                if profile is None or profile.get("account_status") != "active":
+                    continue
+                if province_names and normalize_search_text(request['delivery_city']) not in province_names:
+                    continue
+                if ward_names and normalize_search_text(request.get('delivery_ward') or '') not in ward_names:
+                    continue
+                request_items = items.get(request["id"], [])
+                searchable = normalize_search_text(" ".join([
+                    str(request["title"]), str(request.get("description") or ""),
+                    str(profile["display_name"]),
+                    *(str(item["name"]) for item in request_items),
+                ]))
+                if not all(term in searchable for term in terms):
                     continue
 
-            results.append(ExploreRequest(
-                id=request["id"], customer_id=request["customer_id"],
-                owner_display_name=profile["display_name"],
-                owner_avatar_path=profile.get("avatar_path"),
-                owner_average_rating=profile["average_rating"],
-                owner_rating_count=profile["rating_count"], title=request["title"],
-                description=request.get("description"), currency=request["currency"],
-                estimated_items_total=request.get("estimated_items_total"),
-                delivery_fee=request["delivery_fee"], deliver_by=request.get("deliver_by"),
-                delivery_ward=request.get("delivery_ward"),
-                delivery_district=request.get("delivery_district"),
-                delivery_city=request["delivery_city"], published_at=request.get("published_at"),
-                distance_meters=distance, item_count=len(request_items),
-                items=[ExploreItem(**item) for item in request_items],
-            ))
+                distance = None
+                if (latitude is not None and longitude is not None
+                        and request.get("delivery_latitude") is not None
+                        and request.get("delivery_longitude") is not None):
+                    distance = haversine_meters(
+                        latitude, longitude,
+                        float(request["delivery_latitude"]), float(request["delivery_longitude"]),
+                    )
+                if not province_code and latitude is not None and longitude is not None and radius_meters is not None:
+                    if distance is None or distance > radius_meters:
+                        continue
+
+                results.append(ExploreRequest(
+                    id=request["id"], customer_id=request["customer_id"],
+                    owner_display_name=profile["display_name"],
+                    owner_avatar_path=profile.get("avatar_path"),
+                    owner_average_rating=profile["average_rating"],
+                    owner_rating_count=profile["rating_count"], title=request["title"],
+                    description=request.get("description"), currency=request["currency"],
+                    estimated_items_total=request.get("estimated_items_total"),
+                    delivery_fee=request["delivery_fee"], deliver_by=request.get("deliver_by"),
+                    delivery_ward=request.get("delivery_ward"),
+                    delivery_district=request.get("delivery_district"),
+                    delivery_city=request["delivery_city"], published_at=request.get("published_at"),
+                    distance_meters=distance, item_count=len(request_items),
+                    items=[ExploreItem(**item) for item in request_items],
+                ))
+
+            if len(requests) < 100:
+                break
+            offset += len(requests)
 
         if latitude is not None and longitude is not None:
             results.sort(key=lambda item: item.distance_meters if item.distance_meters is not None else math.inf)
