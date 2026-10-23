@@ -64,3 +64,9 @@ Bước xác nhận cuối trong `create-request.html?step=3` dùng bố cục t
 chỉ đọc: món, ghi chú/thay thế, giao hàng, thanh toán và chi phí. Không có nút
 sửa hay ô nhập tại bước này; quay lại bước trước để chỉnh. Tổng và nút đăng
 được giữ ở chân màn hình. Đây vẫn là prototype, chưa cập nhật mobile.
+
+`order-recipe.html` là bản mẫu nhãn “Có công thức” cho người đăng trên
+danh sách Đơn hàng/Lịch sử, dòng “Xem cách nấu” trong thẻ tổng hợp của màn
+Theo dõi đơn hiện có, và màn Cách nấu mới. Chi tiết yêu cầu không được thêm
+công thức. Có thể chuyển vai trò để thử ẩn nhãn; nội dung chỉ minh họa, chưa
+triển khai mobile, API hay lưu công thức.

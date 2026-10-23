@@ -31,7 +31,7 @@ tables or read-only RPCs directly.
 
 - `GET /api/v1/health`
 - `GET /api/v1/home`
-- `GET /api/v1/explore`
+- `GET /api/v1/explore` — `query` tìm nội dung không dấu; `province_code` và `ward_code` lọc theo địa chỉ giao của đơn. `ward_code` cần đi cùng `province_code`. Khi chọn tỉnh/thành, bán kính không áp dụng; tọa độ (nếu có) vẫn dùng để tính khoảng cách.
 - `GET /api/v1/explore/{request_id}`
 - `GET /api/v1/orders`
 - `POST /api/v1/orders`
@@ -284,10 +284,36 @@ khởi động, endpoint trả 503. Hạn mức Gemini trả 429; kết quả kh
 nhà cung cấp trả 502; timeout trả 504. Không tự thử lại để tránh phát sinh
 thêm lượt gọi. Không gửi địa chỉ, số điện thoại hay token đăng nhập đến Gemini.
 
-API không lưu gợi ý vào database, không đăng đơn và không thêm RPC. Chọn món
+API gợi ý không lưu toàn bộ gợi ý vào database và không đăng đơn. Công thức của món được chọn có thể được lưu cùng đơn khi người dùng xác nhận đăng. Chọn món
 trên app sẽ điền danh sách và giá tham khảo vào luồng tạo yêu cầu hiện có;
 người dùng sửa, chốt tiền/giao hàng và xác nhận trước khi đăng.
 
 `style` là chuỗi tùy chọn (tối đa 1000 ký tự) cho loại món, phong cách ẩm thực
 và mong muốn đổi vị. Bỏ qua trường này vẫn tương thích. Pantry không giới hạn
 mọi gợi ý vào cùng nguyên liệu; avoid và ngân sách vẫn có ưu tiên cao hơn style.
+
+Kết quả có đúng 3 gợi ý: hai lựa chọn thông thường giữ cách đề xuất hiện tại;
+lựa chọn thứ ba là “Thử điều mới”, với mô tả điểm khác biệt. Backend kiểm tra
+số lượng và tên không trùng; mức độ mới lạ là hướng dẫn cho mô hình, không
+phải bảo đảm người dùng chưa từng ăn món đó.
+
+### Công thức theo đơn và quy cách mua
+
+Mỗi gợi ý có `recipe` (`title`, `cookingMinutes`, `servings`, `ingredients`,
+`steps`). `recipe.ingredients` là lượng dùng để nấu, gồm cả đồ sẵn có.
+`ingredients` ngoài cùng là lượng/quy cách mua; `note` ghi lượng tối thiểu
+với gói/hộp nhỏ. Giá tham khảo tính cho lượng mua, không chỉ lượng nấu.
+
+`POST /orders` nhận `recipe` tùy chọn (khách cũ vẫn đăng bình thường). RPC
+`create_and_publish_request` lưu snapshot trong cùng giao dịch, trước publish;
+retry cùng submission key giữ nguyên snapshot. Không backfill công thức cho đơn cũ.
+Chỉnh danh sách đơn không sửa công thức nguyên bản; giao diện cách nấu nhắc
+đối chiếu nguyên liệu. Công thức được giữ trong đơn đã hoàn tất/đã hủy.
+
+`GET /orders/{id}/recipe` chỉ trả snapshot cho customer, người khác nhận 404.
+Danh sách đơn và tracking có `hasRecipe`; chỉ customer được trả true. Không
+thêm công thức vào Explore hay Chi tiết yêu cầu. Database có RLS chỉ cho chủ
+đơn SELECT, không cấp INSERT/UPDATE/DELETE trực tiếp cho authenticated.
+
+Migration: `20261023085134_order_recipe_snapshots.sql`. Kiểm tra giao dịch và
+quyền bằng `supabase/tests/order_recipes.sql`; mọi dữ liệu test được rollback.

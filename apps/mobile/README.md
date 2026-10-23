@@ -104,7 +104,11 @@ before saving. Reverse geocoding is deferred; no Google Geocoding API or server
 Geocoding key is used. Saving without coordinates stays allowed.
 The web version retains manual address entry; the interactive map targets iOS/Android.
 
-Home and Explore use foreground GPS only after the user taps the location control.
+Home and Explore automatically read foreground GPS on focus or when returning
+from the background if permission is already granted. Automatic reads reuse a fix
+for up to 60 seconds to avoid repeated GPS requests when switching tabs. They never
+request permission or open Settings; the location button handles explicit permission
+requests and forces a fresh fix.
 Explore keeps the existing 3 km radius, sorts known distances first, and omits
 orders without coordinates while that radius filter is active. Without GPS,
 orders are shown without distance. Distances are straight-line estimates, not
@@ -159,3 +163,18 @@ nhập tài khoản khác; gợi ý chỉ giữ trong phiên màn hình, không 
 Ô “Hôm nay bạn muốn ăn kiểu gì?” cho nhập tự do và thêm gợi ý nhanh về món
 nước/khô, phong cách ẩm thực hoặc thử món mới. Nội dung được gửi qua trường
 `style` tùy chọn; không thay thế các món kiêng hay ngân sách.
+
+### Xem cách nấu
+
+Có thể xem công thức ngay trong gợi ý. Khi đăng đơn, công thức đã chọn được
+lưu kèm đơn. Chủ đơn mở lại qua nhãn “Có công thức” trong Đơn đã đăng/Lịch sử
+hoặc dòng “Xem cách nấu” trong thẻ tổng hợp Theo dõi đơn. Không thêm lối vào
+ở Chi tiết yêu cầu, và không hiển thị cho shopper. Màn công thức dùng lượng
+để nấu, còn form tạo yêu cầu dùng quy cách mua kèm ghi chú (hộp/gói nhỏ...).
+Công thức là bản gốc đã chọn; việc sửa danh sách mua không tự tạo lại công thức.
+
+Phần xem trước cách nấu dùng native stack `/today-meal/recipe`, không dùng
+React Native Modal. Header navigator quản lý safe area phía trên và cử chỉ
+quay lại iOS; phần nội dung chỉ nhận inset dưới/hai bên. Gợi ý giữ nguyên khi
+pop về `/today-meal`. Dữ liệu xem trước được giới hạn trong navigator theo
+tài khoản, không thay danh sách mua cho đến khi người dùng chọn tiếp tục.
