@@ -55,7 +55,7 @@ const menuItems: Array<{
   { title: 'Lịch sử đơn hàng', subtitle: 'Đơn đã hoàn tất và đã hủy', symbol: { ios: 'clock', android: 'history', web: 'history' } },
   {
     title: 'Địa chỉ của tôi',
-    subtitle: 'Nhà, Công ty',
+    subtitle: 'Quản lý địa chỉ nhận hàng',
     symbol: { ios: 'house', android: 'home', web: 'home' },
   },
   {
@@ -240,7 +240,7 @@ export default function ProfileScreen() {
             <MenuRow
               key={item.title}
               {...item}
-              onPress={item.title === 'Lịch sử đơn hàng' ? () => router.push('/account/order-history') : undefined}
+              onPress={item.title === 'Lịch sử đơn hàng' ? () => router.push('/account/order-history') : item.title === 'Địa chỉ của tôi' ? () => router.push('/account/addresses') : undefined}
               isLast={index === menuItems.length - 1}
             />
           ))}

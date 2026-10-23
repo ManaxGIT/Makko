@@ -50,6 +50,15 @@ export function DeliveryAddressFields({ value, onChange }: { value: DeliveryAddr
   }, [provinceCode, wardAttempt]);
 
   return <>
+    <View style={styles.field}><Text style={styles.label}>Số điện thoại liên hệ</Text><TextInput accessibilityLabel="Số điện thoại liên hệ" value={value.phone} onChangeText={phone => onChange({ ...value, phone })} placeholder="Số điện thoại để người giao liên hệ" placeholderTextColor={colors.mutedLight} style={styles.input} keyboardType="phone-pad" autoComplete="tel" maxLength={21} /></View>
+    <AdministrativeDropdown label="Tỉnh / Thành phố" value={value.province} options={provinces} placeholder="Chọn tỉnh / thành phố" loading={provinceLoading} error={provinceError} expanded={open === 'province'} onToggle={() => setOpen(open === 'province' ? null : 'province')} onRetry={() => setProvinceAttempt(n => n + 1)} onSelect={province => {
+      onChange({ ...value, province, ward: province.code === provinceCode ? value.ward : null });
+      setOpen('ward');
+    }} />
+    <AdministrativeDropdown label="Xã / Phường" value={value.ward} options={wardResult?.provinceCode === provinceCode ? wardResult?.rows ?? [] : []} placeholder={provinceCode ? 'Chọn xã / phường' : 'Chọn tỉnh / thành phố trước'} disabled={!provinceCode} loading={wardLoading || (!!provinceCode && wardResult?.provinceCode !== provinceCode && !wardError)} error={wardError} expanded={open === 'ward'} onToggle={() => setOpen(open === 'ward' ? null : 'ward')} onRetry={() => setWardAttempt(n => n + 1)} onSelect={ward => { onChange({ ...value, ward }); setOpen(null); }} />
+    <View style={styles.field}><Text style={styles.label}>Số nhà, tên đường</Text><TextInput accessibilityLabel="Số nhà, tên đường" value={value.line1} onChangeText={line1 => onChange({ ...value, line1 })} placeholder="Ví dụ: 12 Nguyễn Huệ, tầng 2" placeholderTextColor={colors.mutedLight} style={styles.input} maxLength={300} autoComplete="street-address" /></View>
+
+
     <View style={styles.field}>
       <Text style={styles.label}>Vị trí nhận hàng · Không bắt buộc</Text>
       <Text style={styles.text}>Nếu nhận hàng tại nơi bạn đang đứng, dùng GPS để lưu vị trí. Địa chỉ chữ vẫn nhập thủ công bên dưới.</Text>
@@ -61,13 +70,6 @@ export function DeliveryAddressFields({ value, onChange }: { value: DeliveryAddr
       </>}
       {!value.coordinates && <Text style={styles.text}>Chưa chọn điểm: đơn vẫn đăng được nhưng chưa có khoảng cách.</Text>}
     </View>
-    <AdministrativeDropdown label="Tỉnh / Thành phố" value={value.province} options={provinces} placeholder="Chọn tỉnh / thành phố" loading={provinceLoading} error={provinceError} expanded={open === 'province'} onToggle={() => setOpen(open === 'province' ? null : 'province')} onRetry={() => setProvinceAttempt(n => n + 1)} onSelect={province => {
-      onChange({ ...value, province, ward: province.code === provinceCode ? value.ward : null });
-      setOpen('ward');
-    }} />
-    <AdministrativeDropdown label="Xã / Phường" value={value.ward} options={wardResult?.provinceCode === provinceCode ? wardResult?.rows ?? [] : []} placeholder={provinceCode ? 'Chọn xã / phường' : 'Chọn tỉnh / thành phố trước'} disabled={!provinceCode} loading={wardLoading || (!!provinceCode && wardResult?.provinceCode !== provinceCode && !wardError)} error={wardError} expanded={open === 'ward'} onToggle={() => setOpen(open === 'ward' ? null : 'ward')} onRetry={() => setWardAttempt(n => n + 1)} onSelect={ward => { onChange({ ...value, ward }); setOpen(null); }} />
-    <View style={styles.field}><Text style={styles.label}>Số nhà, tên đường</Text><TextInput accessibilityLabel="Số nhà, tên đường" value={value.line1} onChangeText={line1 => onChange({ ...value, line1 })} placeholder="Ví dụ: 12 Nguyễn Huệ, tầng 2" placeholderTextColor={colors.mutedLight} style={styles.input} maxLength={300} autoComplete="street-address" /></View>
-    <View style={styles.field}><Text style={styles.label}>Số điện thoại liên hệ</Text><TextInput accessibilityLabel="Số điện thoại liên hệ" value={value.phone} onChangeText={phone => onChange({ ...value, phone })} placeholder="Số điện thoại để người giao liên hệ" placeholderTextColor={colors.mutedLight} style={styles.input} keyboardType="phone-pad" autoComplete="tel" maxLength={21} /></View>
   </>;
 }
 

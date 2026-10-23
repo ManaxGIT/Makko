@@ -8,7 +8,7 @@ export class ApiError extends Error {
 
 type QueryParams = Record<string, string | number | null | undefined>;
 
-async function apiRequest<T>(method: 'GET' | 'POST' | 'PATCH', path: string, options: { params?: QueryParams; body?: unknown; expectedUserId?: string } = {}): Promise<T> {
+async function apiRequest<T>(method: 'GET' | 'POST' | 'PATCH' | 'DELETE', path: string, options: { params?: QueryParams; body?: unknown; expectedUserId?: string } = {}): Promise<T> {
   if (!apiUrl) throw new Error('EXPO_PUBLIC_API_URL chưa được cấu hình.');
 
   const { data: { session }, error: sessionError } = await supabase.auth.getSession();
@@ -38,8 +38,8 @@ async function apiRequest<T>(method: 'GET' | 'POST' | 'PATCH', path: string, opt
   return payload as T;
 }
 
-export function apiGet<T>(path: string, params?: QueryParams) {
-  return apiRequest<T>('GET', path, { params });
+export function apiGet<T>(path: string, params?: QueryParams, expectedUserId?: string) {
+  return apiRequest<T>('GET', path, { params, expectedUserId });
 }
 
 export function apiPost<T>(path: string, body?: unknown, expectedUserId?: string) {
@@ -48,4 +48,8 @@ export function apiPost<T>(path: string, body?: unknown, expectedUserId?: string
 
 export function apiPatch<T>(path: string, body: unknown, expectedUserId?: string) {
   return apiRequest<T>('PATCH', path, { body, expectedUserId });
+}
+
+export function apiDelete<T>(path: string, params?: QueryParams, expectedUserId?: string) {
+  return apiRequest<T>('DELETE', path, { params, expectedUserId });
 }

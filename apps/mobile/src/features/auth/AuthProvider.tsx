@@ -1,6 +1,7 @@
 import { createContext, type ReactNode, useContext, useEffect, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 
+import { clearAddressLists } from '@/features/addresses/listCache';
 import { clearOrderLists } from '@/features/orders/listCache';
 import { supabase } from '@/lib/supabase';
 
@@ -24,7 +25,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      if (accountId !== nextSession?.user.id) clearOrderLists();
+      if (accountId !== nextSession?.user.id) { clearOrderLists(); clearAddressLists(); }
       accountId = nextSession?.user.id;
       setSession(nextSession);
       setIsLoading(false);

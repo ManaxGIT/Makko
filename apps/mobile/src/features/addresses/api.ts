@@ -1,4 +1,4 @@
-import { apiGet, apiPost } from '@/lib/api';
+import { apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api';
 
 export type Province = { code: string; name: string; fullName: string };
 export type Ward = Province & { provinceCode: string };
@@ -54,4 +54,23 @@ export async function getPreferredAddress(): Promise<SavedAddress | null> {
 
 export function saveAddress(body: CreateAddressBody, expectedUserId: string) {
   return apiPost<SavedAddress>('/api/v1/addresses', body, expectedUserId);
+}
+
+
+export async function getAddresses(userId: string): Promise<SavedAddress[]> {
+  const rows: SavedAddress[] = [];
+  for (let offset = 0; ; offset += 100) {
+    const page = await apiGet<SavedAddress[]>('/api/v1/addresses', { limit: 100, offset }, userId);
+    rows.push(...page);
+    if (page.length < 100) return rows;
+  }
+}
+export function updateAddress(id: string, body: CreateAddressBody, userId: string) {
+  return apiPatch<SavedAddress[]>(`/api/v1/addresses/${encodeURIComponent(id)}`, body, userId);
+}
+export function setDefaultAddress(id: string, userId: string) {
+  return apiPost<SavedAddress[]>(`/api/v1/addresses/${encodeURIComponent(id)}/default`, undefined, userId);
+}
+export function deleteAddress(id: string, replacementId: string | null, userId: string) {
+  return apiDelete<SavedAddress[]>(`/api/v1/addresses/${encodeURIComponent(id)}`, { replacement_address_id: replacementId }, userId);
 }
