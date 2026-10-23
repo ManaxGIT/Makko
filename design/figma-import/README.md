@@ -70,3 +70,19 @@ danh sách Đơn hàng/Lịch sử, dòng “Xem cách nấu” trong thẻ tổ
 Theo dõi đơn hiện có, và màn Cách nấu mới. Chi tiết yêu cầu không được thêm
 công thức. Có thể chuyển vai trò để thử ẩn nhãn; nội dung chỉ minh họa, chưa
 triển khai mobile, API hay lưu công thức.
+
+## Sổ địa chỉ và chọn địa chỉ nhận
+
+`saved-addresses.html` gồm ba khung 390 × 844: danh sách địa chỉ tài khoản,
+form thêm/sửa và popup chọn địa chỉ trượt từ dưới lên trên màn đăng yêu cầu. Các khung dùng chung dữ liệu mẫu
+trong bộ nhớ; tải lại trang sẽ khôi phục dữ liệu, chưa gọi API hay lưu tài khoản.
+Có thể thử đặt mặc định, chọn riêng cho một yêu cầu, mô phỏng yêu cầu mới,
+xóa mặc định với địa chỉ thay thế và trạng thái chưa có địa chỉ. Xóa địa chỉ
+đang dùng buộc chọn lại. Địa chỉ đầu tiên tự làm mặc định.
+Danh sách hành chính chỉ là dữ liệu mẫu hai thành phố; nút GPS chỉ giải thích
+hành vi, không xin quyền hoặc đọc vị trí thật. Phần cuối form có thể cuộn.
+Mở tại `http://127.0.0.1:4173/saved-addresses.html`; ảnh duyệt ở
+`saved-addresses-preview.jpg`, ảnh riêng popup ở `saved-addresses-popup-preview.jpg`.
+Popup có nút đóng, chạm nền để đóng và chỉ áp dụng địa chỉ khi xác nhận.
+Thiết kế đã được duyệt và được triển khai trong mobile/API; trang này vẫn chỉ
+là prototype dữ liệu mẫu để tham chiếu, không kết nối tài khoản thật.
