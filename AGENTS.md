@@ -41,6 +41,12 @@ and temporary prototype compromises.
   The user's explicit decision then becomes authoritative and should be recorded
   in this file only when it is a durable instruction for future agents.
 
+## Git commits and pushes
+
+- User instruction (2026-10-29): a request to commit and push authorizes multiple
+  logically grouped commits in that request. Do not assume all changes must be
+  combined into one commit; no additional confirmation is needed for each commit.
+
 ## Adding notes
 
 - Put durable instructions that future agents must remember in `AGENTS.md`.
@@ -212,6 +218,12 @@ and the corresponding Supabase provider/configuration have been verified.
 
 ## Purchase agreement and evidence
 
+- User decision (2026-10-24): only the customer may initiate renegotiation of
+  the agreed goods amount after acceptance, including while shopping is in progress.
+  Both customer and assigned shopper must confirm before the new amount applies.
+  The separate errand fee is outside this adjustment feature. Pending proposals
+  survive the start of shopping and expire when leaving accepted/shopping;
+  consent is tied to the current assignment, never a later shopper.
 - User decision (2026-10-22): orders use a fixed goods amount plus a separate
   errand fee. When buying the full, correct order, the shopper keeps savings and
   bears overruns; do not recalculate customer payment from actual purchase cost.
@@ -219,7 +231,7 @@ and the corresponding Supabase provider/configuration have been verified.
   `estimated_items_total` field now holds the agreed amount for compatibility;
   `actual_items_total` remains separate. Do not fabricate actual costs.
 - Missing or substituted goods require customer agreement and a corresponding
-  price adjustment. The adjustment workflow is not implemented; do not silently
+  price adjustment. The missing/substituted-item workflow is not implemented; do not silently
   deduct or let a missing-item flow proceed as a fully purchased order.
 - Purchase evidence uses private Storage, goods photos and optional receipt
   photos classified separately. Final item confirmation, evidence registration,
