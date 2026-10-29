@@ -24,6 +24,9 @@ from app.services.purchase_evidence import PurchaseEvidenceService
 from app.schemas.reviews import OrderReview, OrderReviewContext, SubmitReviewBody
 from app.services.reviews import ReviewService
 
+from app.schemas.goods_agreement import GoodsAmountAgreement, ProposeGoodsAmountBody, RespondGoodsAmountBody
+from app.services.goods_agreement import GoodsAgreementService
+
 router = APIRouter(prefix="/orders", tags=["orders"])
 
 
@@ -209,3 +212,30 @@ async def submit_order_review(
     repository: Annotated[SupabaseRepository, Depends(get_repository)],
 ) -> OrderReview:
     return await ReviewService(repository).submit(request_id, body, user.access_token)
+
+
+@router.get('/{request_id}/goods-agreement', response_model=GoodsAmountAgreement, response_model_by_alias=True)
+async def get_goods_agreement(
+    request_id: UUID,
+    user: Annotated[CurrentUser, Depends(get_current_user)],
+    repository: Annotated[SupabaseRepository, Depends(get_repository)],
+) -> GoodsAmountAgreement:
+    return await GoodsAgreementService(repository).get(request_id, user.access_token)
+
+
+@router.post('/{request_id}/goods-agreement', response_model=GoodsAmountAgreement, response_model_by_alias=True)
+async def propose_goods_amount(
+    request_id: UUID, body: ProposeGoodsAmountBody,
+    user: Annotated[CurrentUser, Depends(get_current_user)],
+    repository: Annotated[SupabaseRepository, Depends(get_repository)],
+) -> GoodsAmountAgreement:
+    return await GoodsAgreementService(repository).propose(request_id, body, user.access_token)
+
+
+@router.post('/{request_id}/goods-agreement/{proposal_id}/response', response_model=GoodsAmountAgreement, response_model_by_alias=True)
+async def respond_goods_amount(
+    request_id: UUID, proposal_id: UUID, body: RespondGoodsAmountBody,
+    user: Annotated[CurrentUser, Depends(get_current_user)],
+    repository: Annotated[SupabaseRepository, Depends(get_repository)],
+) -> GoodsAmountAgreement:
+    return await GoodsAgreementService(repository).respond(request_id, proposal_id, body, user.access_token)

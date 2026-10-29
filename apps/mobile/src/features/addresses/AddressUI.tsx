@@ -1,5 +1,5 @@
 import type { PropsWithChildren } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '@/theme/colors';
 import { fontFamilies, fontSizes, lineHeights } from '@/theme/typography';
@@ -13,8 +13,21 @@ export function AddressCard({ address, selected, onPress, children }: PropsWithC
   const content = <><View style={a.row}><View style={a.icon}><Text style={a.iconText}>{address.label === 'Nhà' ? '⌂' : '⌖'}</Text></View><Text style={[a.bold, a.flex]}>{address.label}</Text>{address.isDefault && <Text style={a.badge}>Mặc định</Text>}{onPress && <View style={[a.radio, selected && a.checked]} />}</View><Text style={[a.smallBold, a.recipient]}>{address.recipientName} · {address.recipientPhone}</Text><Text style={a.body}>{formatDeliveryAddress(fromSavedAddress(address))}</Text>{!!address.deliveryNote && <Text style={a.hint}>{address.deliveryNote}</Text>}{children}</>;
   return onPress ? <Pressable accessibilityRole="radio" accessibilityLabel={`${address.label}, ${address.recipientName}, ${formatDeliveryAddress(fromSavedAddress(address))}`} accessibilityState={{ checked: !!selected }} onPress={onPress} style={[a.card, selected && a.selected]}>{content}</Pressable> : <View style={a.card}>{content}</View>;
 }
-export function AddressSheet({ visible, title, onClose, children, footer }: PropsWithChildren<{ visible: boolean; title: string; onClose: () => void; footer?: React.ReactNode }>) {
-  return <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}><View style={a.overlay}><Pressable accessibilityLabel="Đóng popup" onPress={onClose} style={StyleSheet.absoluteFill} /><SafeAreaView edges={['bottom', 'left', 'right']} accessibilityViewIsModal style={a.sheet}><View style={a.handle} /><View style={a.sheetHeader}><Text accessibilityRole="header" style={[a.sheetTitle, a.flex]}>{title}</Text><Pressable accessibilityRole="button" accessibilityLabel="Đóng" onPress={onClose} style={a.close}><Text style={a.closeText}>×</Text></Pressable></View>{children}{footer && <View style={a.footer}>{footer}</View>}</SafeAreaView></View></Modal>;
+export function AddressSheet({ visible, title, onClose, children, footer, avoidKeyboard = false }: PropsWithChildren<{ visible: boolean; title: string; onClose: () => void; footer?: React.ReactNode; avoidKeyboard?: boolean }>) {
+  return <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <KeyboardAvoidingView enabled={avoidKeyboard} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={a.overlay}>
+      <Pressable accessibilityLabel="Đóng popup" onPress={onClose} style={StyleSheet.absoluteFill} />
+      <SafeAreaView edges={['bottom', 'left', 'right']} accessibilityViewIsModal style={a.sheet}>
+        <View style={a.handle} />
+        <View style={a.sheetHeader}>
+          <Text accessibilityRole="header" style={[a.sheetTitle, a.flex]}>{title}</Text>
+          <Pressable accessibilityRole="button" accessibilityLabel="Đóng" onPress={onClose} style={a.close}><Text style={a.closeText}>×</Text></Pressable>
+        </View>
+        {children}
+        {footer && <View style={a.footer}>{footer}</View>}
+      </SafeAreaView>
+    </KeyboardAvoidingView>
+  </Modal>;
 }
 export const a = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background }, flex: { flex: 1 },
@@ -41,7 +54,7 @@ export const a = StyleSheet.create({
   touch: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 4 },
   footer: { paddingHorizontal: 18, paddingTop: 12, paddingBottom: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, gap: 8 },
   overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: '#142B2359' },
-  sheet: { maxHeight: '80%', backgroundColor: colors.background, borderTopLeftRadius: 25, borderTopRightRadius: 25 },
+  sheet: { maxHeight: '80%', flexShrink: 1, backgroundColor: colors.background, borderTopLeftRadius: 25, borderTopRightRadius: 25 },
   handle: { width: 36, height: 4, borderRadius: 9, backgroundColor: colors.border, alignSelf: 'center', marginTop: 10, marginBottom: 3 },
   sheetHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 18, paddingTop: 7, paddingBottom: 10 },
   close: { minHeight: 44, minWidth: 44, justifyContent: 'center', alignItems: 'center' }, closeText: { color: colors.forest, fontFamily: fontFamilies.body, fontSize: fontSizes.pageTitle },

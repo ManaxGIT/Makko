@@ -16,6 +16,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { GoodsAgreementPanel } from '@/features/orders/GoodsAgreementPanel';
 import { EvidenceGallery } from '@/features/orders/EvidenceGallery';
 import { colors } from '@/theme/colors';
 import { fontFamilies, fontSizes, letterSpacing, lineHeights } from '@/theme/typography';
@@ -300,7 +301,6 @@ export default function OrderTrackingScreen() {
   const lastStatusTime = order ? formatTime(order.statusHistory.filter(event => event.toStatus === order.status).at(-1)?.createdAt ?? null) : null;
   const showEvidence = !!order && (order.status === 'delivering' || order.status === 'delivered' || order.status === 'completed'
     || ((order.status === 'cancelled' || order.status === 'disputed') && order.statusHistory.some(event => ['delivering', 'delivered', 'completed'].includes(event.toStatus))));
-  const money = (value: number | null, currency = detail?.currency ?? 'VND') => value === null ? 'Chưa có thông tin' : new Intl.NumberFormat('vi-VN', { style: 'currency', currency, maximumFractionDigits: 0 }).format(value);
   const currentMilestoneIndex = order ? milestones.indexOf(order.status) : -1;
 
   const handleRefresh = useCallback(async () => {
@@ -444,10 +444,7 @@ export default function OrderTrackingScreen() {
         <View style={styles.summaryCard}>
           <Text style={styles.summaryTitle}>{detail?.title ?? 'Thông tin đơn hàng'}</Text>
           {detail ? <>
-            <View style={styles.summaryRow}><Text style={styles.summaryLabel}>{detail.itemCount} món · Tiền hàng</Text><Text style={styles.summaryValue}>{money(detail.estimatedItemsTotal)}</Text></View>
-            <View style={styles.summaryRow}><Text style={styles.summaryLabel}>Phí đi chợ</Text><Text style={styles.summaryValue}>{money(detail.deliveryFee)}</Text></View>
-            <View style={styles.summaryRow}><Text style={styles.summaryValue}>Tổng tiền đã chốt</Text><Text style={styles.summaryValue}>{money(detail.estimatedItemsTotal === null ? null : detail.estimatedItemsTotal + detail.deliveryFee)}</Text></View>
-            <Text style={styles.summaryNote}>Tổng tiền giữ nguyên khi mua đủ, đúng yêu cầu.</Text>
+            <GoodsAgreementPanel key={id} requestId={id} detail={detail} />
             {order.status === 'delivering' && <Text style={styles.summaryNote}>Khu vực giao: {[detail.deliveryWard, detail.deliveryDistrict, detail.deliveryCity].filter(Boolean).join(', ') || 'Chưa có thông tin'}</Text>}
           </> : <Text style={styles.summaryNote}>{detailError ? 'Chưa tải được thông tin đơn. Kéo xuống để thử lại.' : 'Đang tải thông tin đơn…'}</Text>}
           {order.role === 'customer' && order.hasRecipe && <RecipeLink onPress={() => router.push(`/requests/${id}/recipe`)} />}
@@ -531,9 +528,6 @@ const styles = StyleSheet.create({
   waitingMessage: { color: colors.muted, fontFamily: fontFamilies.body, fontSize: fontSizes.bodySmall, lineHeight: lineHeights.bodySmall, textAlign: 'center', paddingVertical: 8 },
   summaryCard: { marginHorizontal: 20, marginTop: 16, padding: 14, gap: 8, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 14 },
   summaryTitle: { fontFamily: fontFamilies.bodyBold, fontSize: fontSizes.bodySmall, color: colors.forest, marginBottom: 2 },
-  summaryRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' },
-  summaryLabel: { fontFamily: fontFamilies.body, fontSize: fontSizes.caption, color: colors.text },
-  summaryValue: { fontFamily: fontFamilies.bodyBold, fontSize: fontSizes.caption, color: colors.text },
   summaryNote: { fontFamily: fontFamilies.body, fontSize: fontSizes.caption, lineHeight: lineHeights.caption, color: colors.muted },
   evidence: { marginTop: 8 },
   shoppingHint: { backgroundColor: colors.cream, borderRadius: 12, padding: 12, marginTop: 8 },

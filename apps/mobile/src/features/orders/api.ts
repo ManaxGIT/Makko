@@ -111,3 +111,29 @@ export type AccountReputation = {
 export function getReceivedReviews(offset = 0, limit = 20) {
   return apiGet<AccountReputation>('/api/v1/home/profile/reviews', { offset, limit });
 }
+
+export type GoodsAmountAgreement = {
+  requestId: string;
+  role: 'customer' | 'shopper';
+  status: OrderStatus;
+  currency: string;
+  agreedAmount: number | null;
+  deliveryFee: number;
+  canPropose: boolean;
+  proposal: {
+    id: string; oldAmount: number | null; newAmount: number;
+    status: 'pending' | 'accepted' | 'rejected' | 'expired';
+    createdAt: string; respondedAt: string | null;
+  } | null;
+};
+export function getGoodsAgreement(id: string, ownerId: string) {
+  return apiGet<GoodsAmountAgreement>(`/api/v1/orders/${id}/goods-agreement`, undefined, ownerId);
+}
+export function proposeGoodsAmount(id: string, amount: number, ownerId: string) {
+  return apiPost<GoodsAmountAgreement>(`/api/v1/orders/${id}/goods-agreement`, { amount }, ownerId)
+    .then(result => { invalidateOrderLists(); return result; });
+}
+export function respondGoodsAmount(id: string, proposalId: string, accept: boolean, ownerId: string) {
+  return apiPost<GoodsAmountAgreement>(`/api/v1/orders/${id}/goods-agreement/${proposalId}/response`, { accept }, ownerId)
+    .then(result => { invalidateOrderLists(); return result; });
+}

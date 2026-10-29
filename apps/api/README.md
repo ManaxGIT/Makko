@@ -360,3 +360,11 @@ Xóa chỉ làm null liên kết nguồn của đơn, không thay bản chốt �
 
 Migration `20261023132806_saved_address_management.sql`; kiểm tra rollback với
 `supabase/tests/saved_address_management.sql` dùng tài khoản và đơn tổng hợp.
+
+### Thỏa thuận lại tiền hàng
+
+- `GET /api/v1/orders/{id}/goods-agreement`: tiền hàng đang áp dụng, phí đi chợ và đề nghị gần nhất của lượt nhận hiện tại. Chỉ hai bên hiện tại được đọc.
+- `POST /api/v1/orders/{id}/goods-agreement`, body `{ "amount": 200000 }`: người đăng xác nhận và gửi mức tiền hàng mới khi đơn ở `accepted` hoặc `shopping`. Chỉ có một đề nghị chờ xác nhận; tiền hiện tại chưa thay đổi.
+- `POST /api/v1/orders/{id}/goods-agreement/{proposalId}/response`, body `{ "accept": true }` (hoặc `false`): chỉ người đi chợ đang nhận đơn được đồng ý/từ chối mức tiền cụ thể đó.
+
+Các thao tác chạy qua RPC với JWT người dùng và khóa cùng dòng đơn với chuyển trạng thái/hủy nhận đơn. `accepted → shopping` giữ đề nghị chờ; rời hai giai đoạn này làm đề nghị hết hiệu lực. Đề nghị gắn với lượt nhận đơn để người nhận sau không dùng lại xác nhận cũ. Phí đi chợ và chi phí mua thực tế không bị sửa. Các lần gửi/xác nhận giống hệt khi đề nghị chưa thay đổi không tạo thêm bản ghi hoặc sửa quyết định đã chốt.
