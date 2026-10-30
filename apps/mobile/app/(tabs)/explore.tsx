@@ -1,3 +1,4 @@
+import { ExploreWeeklyFood } from '@/features/explore/ExploreWeeklyFood';
 import { AvatarImage } from '@/components/ui/AvatarImage';
 import type { ComponentProps } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -73,6 +74,7 @@ function RequestCard({ request }: { request: Request }) {
 
   return (
     <View style={styles.card}>
+      <Text style={styles.jobBadge}>Đơn nhờ đi chợ</Text>
       <View style={styles.ownerRow}>
         <View style={[styles.avatar, { backgroundColor: request.avatarColor }]}>
           <Text style={[styles.avatarText, { color: request.avatarText }]}>{request.initials}</Text><AvatarImage path={request.avatarPath} borderRadius={12} />
@@ -114,6 +116,7 @@ export default function ExploreScreen() {
 
 function AccountExploreScreen() {
   const { coordinates, locating, error: locationError, locate } = useNearbyLocation();
+  const [jobType, setJobType] = useState<'errand' | 'weekly'>('errand');
   const [mode, setMode] = useState<'nearby' | 'area'>('nearby');
   const [area, setArea] = useState<ExploreArea>({ province: null, ward: null });
   const provinceCode = mode === 'area' ? area.province?.code : undefined;
@@ -185,9 +188,7 @@ function AccountExploreScreen() {
     });
   }, [nearest, requests, unavailableRequestIds]);
 
-  return (
-    <SafeAreaView edges={['top']} style={styles.safeArea}>
-      <ScrollView refreshControl={<RefreshControl refreshing={pullRefreshing} onRefresh={() => { setPullRefreshing(true); void refreshRequests().finally(() => setPullRefreshing(false)); }} tintColor={colors.forest} />} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+  const header = <>
         <View style={styles.header}>
           <View><Text style={styles.eyebrow}>KHÁM PHÁ QUANH BẠN</Text><Text style={styles.heading}>Ai đang cần giúp?</Text></View>
           <Pressable accessibilityLabel="Xem thông báo" style={styles.iconButton}>
@@ -195,6 +196,13 @@ function AccountExploreScreen() {
             <View style={styles.notificationDot} />
           </Pressable>
         </View>
+        <View accessibilityRole="tablist" style={styles.jobTypes}>{([['errand','Đơn nhờ đi chợ'],['weekly','Gói nguyên liệu']] as const).map(([type,label]) => <Pressable key={type} accessibilityRole="tab" accessibilityState={{selected:jobType === type}} onPress={() => setJobType(type)} style={[styles.jobType,jobType === type && styles.jobTypeSelected]}><Text style={styles.jobTypeText}>{label}</Text></Pressable>)}</View>
+  </>;
+
+  return (
+    <SafeAreaView edges={['top']} style={styles.safeArea}>
+      <ScrollView style={{display:jobType === 'errand' ? 'flex' : 'none'}} accessibilityElementsHidden={jobType !== 'errand'} importantForAccessibility={jobType !== 'errand' ? 'no-hide-descendants' : 'auto'} refreshControl={<RefreshControl refreshing={pullRefreshing} onRefresh={() => { setPullRefreshing(true); void refreshRequests().finally(() => setPullRefreshing(false)); }} tintColor={colors.forest} />} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        {header}
 
         <View style={styles.searchBox}>
           <Icon name={{ ios: 'magnifyingglass', android: 'search', web: 'search' }} size={19} />
@@ -237,11 +245,17 @@ function AccountExploreScreen() {
 
         <View style={styles.communityBanner}><Text style={styles.communityIcon}>♧</Text><View style={styles.communityCopy}><Text style={styles.communityTitle}>Một chuyến đi, thêm một kết nối.</Text><Text style={styles.communityText}>Chọn yêu cầu tiện đường và giúp một người hàng xóm.</Text></View></View>
       </ScrollView>
+      <ExploreWeeklyFood hidden={jobType !== 'weekly'} header={header}/>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  jobTypes: { flexDirection: 'row', gap: 8, marginHorizontal: 20, marginBottom: 16 },
+  jobType: { flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 12, padding: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
+  jobTypeSelected: { backgroundColor: colors.cream, borderColor: colors.orange },
+  jobTypeText: { fontFamily: fontFamilies.bodyBold, fontSize: fontSizes.bodySmall, lineHeight: lineHeights.bodySmall, color: colors.forest },
+  jobBadge: { alignSelf: 'flex-start', backgroundColor: colors.chip, borderRadius: 7, paddingVertical: 5, paddingHorizontal: 8, color: colors.forest, fontFamily: fontFamilies.bodyBold, fontSize: fontSizes.caption, lineHeight: lineHeights.caption },
   safeArea: { backgroundColor: colors.background, flex: 1 }, content: { paddingBottom: 28 },
   header: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', paddingBottom: 16, paddingHorizontal: 20, paddingTop: 22 },
   eyebrow: { color: colors.coral, fontFamily: fontFamilies.bodyExtraBold, fontSize: fontSizes.caption, letterSpacing: letterSpacing.eyebrow },

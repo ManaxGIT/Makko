@@ -33,6 +33,7 @@ function screen() {
     if (name === 'react/jsx-runtime') return { jsx, jsxs: jsx };
     if (name === 'react-native') return { StyleSheet: { create: x => x }, ...Object.fromEntries(['ActivityIndicator','Pressable','RefreshControl','ScrollView','Text','TextInput','View'].map(x => [x, x])) };
     if (name === 'expo-router') return { useFocusEffect() {}, useRouter: () => ({}) };
+    if (name === '@/features/explore/ExploreWeeklyFood') return { ExploreWeeklyFood: 'ExploreWeeklyFood' };
     if (name === '@/components/ui/AvatarImage') return { AvatarImage: 'AvatarImage' };
     if (name === 'expo-symbols') return { SymbolView: 'SymbolView' };
     if (name === 'react-native-safe-area-context') return { SafeAreaView: 'SafeAreaView' };
@@ -57,7 +58,7 @@ function screen() {
     return [node, ...nodes(node.props?.children ?? null)];
   }
   render();
-  return { calls, render, find: type => nodes().find(n => n.type === type),
+  return { calls, render, find: type => nodes().find(n => n.type === type), findAll: type => nodes().filter(n => n.type === type),
     text: () => nodes().filter(n => n.type === 'Text').map(n => n.props.children).flat().join(' '),
     runTimers() { const pending = [...timers.values()]; timers.clear(); pending.forEach(fn => fn()); },
     unmount() { slots.forEach(s => s?.cleanup?.()); },
@@ -98,4 +99,20 @@ test('refresh deduplicates ongoing reads and retains a loaded empty result after
   assert.ok(s.text().includes('Network unavailable'));
   assert.ok(s.text().includes('0 yêu cầu phù hợp'));
   assert.ok(!s.text().includes('Không thể tải yêu cầu')); s.unmount();
+});
+
+
+test('Explore exposes weekly delivery directly and preserves the errand filters',()=>{
+  const s=screen();selectArea(s);
+  s.find('TextInput').props.onChangeText('rau');s.render();
+  const tabs=()=>s.findAll('Pressable').filter(n=>n.props.accessibilityRole==='tab');
+  assert.equal(tabs().length,2);
+  tabs()[1].props.onPress();s.render();
+  assert.equal(s.find('ExploreWeeklyFood').props.hidden,false);
+  assert.equal(s.find('ScrollView').props.style.display,'none');
+  tabs()[0].props.onPress();s.render();
+  assert.equal(s.find('ExploreWeeklyFood').props.hidden,true);
+  assert.equal(s.find('TextInput').props.value,'rau');
+  assert.equal(s.find('AreaFilter').props.value.province.code,'48');
+  s.unmount();
 });
