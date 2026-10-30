@@ -10,3 +10,5 @@
 .menu-fieldset{border:0;padding:0;margin:0;min-width:0}.menu-edit-back{width:100%;margin-top:10px}.menu-success{background:#E0EDDA;border:1px solid var(--border);border-radius:16px;padding:24px;margin-bottom:22px}.menu-success h2{margin-top:12px}.menu-success button{margin-top:12px}.weekly-menu{padding-bottom:22px}
 
 .ingredient-totals{padding:24px;margin-bottom:22px}.ingredient-totals h2{margin:10px 0}.ingredient-totals h3{margin-top:20px}.ingredient-totals .row{gap:16px;align-items:start;overflow-wrap:anywhere}.ingredient-totals .row> :last-child{flex-shrink:0;max-width:45%;text-align:right}.ingredient-totals .row .menu-help{margin:4px 0 0}
+
+.package-list{margin-bottom:28px}.package-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.danger{color:var(--coral);border-color:var(--coral);background:var(--surface)}.package-confirm{padding:28px}.package-confirm .package-actions{justify-content:flex-end;margin-top:22px}#new-week-editor{scroll-margin-top:20px}@media(max-width:650px){.package-list .panel-head{align-items:flex-start;gap:12px;flex-direction:column}}

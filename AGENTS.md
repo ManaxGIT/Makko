@@ -152,7 +152,32 @@ and the corresponding Supabase provider/configuration have been verified.
 - User decision (2026-10-31): users can accept weekly-package delivery directly
   from Explore. Distinguish errand requests and weekly packages with explicit
   type labels; reuse the existing atomic weekly acceptance API and eligibility
-  rules. The separate weekly-order management screen remains available.
+  rules. The separate weekly-order list has been retired; existing links to it
+  redirect to the shared Orders tab. Keep weekly-package detail/tracking screens.
+
+- User decision (2026-10-31): the Orders tab and Account order history merge
+  errand requests and weekly packages under the existing customer/shopper tabs,
+  with explicit type labels and combined counts. Keep `delivered` active until
+  the customer confirms receipt.
+- User decision (2026-10-31): opening a weekly package must show its ingredients,
+  scaled quantities, delivery deadline, advance and wage before accepting it.
+  Only the separate “Xác nhận nhận giao” action in Explore may call `accept`.
+  Assigned packages are opened through the shared Orders/history lists.
+  Opening/closing the preview never accepts.
+  Do not expose private customer contact or exact address before assignment.
+
+- User decision (2026-10-31): show published weekly packages as distinct
+  consumption weeks and let customers select a week. Ingredients, checkout and
+  registration must use that selected week's ID. Hide weeks whose registration cutoff has passed from the registration picker.
+  Place the ingredient-preview action inside each week card; do not add a separate
+  ingredient-preview card. Keep historical weeks and existing orders in storage. Preserve the selection on refresh; never silently
+  replace a selected week that disappeared or passed its registration cutoff.
+
+- User decision (2026-10-31): admin package management lists all published weeks,
+  including expired ones. A package can be deleted only if it has never had an
+  order; cancelled/completed orders also block deletion. Retain existing orders
+  and their ingredients/history. Check deletion atomically with registration in
+  PostgreSQL, and require an explicit confirmation in the admin web.
 
 ## Personal profile
 

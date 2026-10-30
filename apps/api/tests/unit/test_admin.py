@@ -192,3 +192,67 @@ def test_weekly_catalogue_returns_flat_ingredients_through_route(api):
     assert response.status_code==200
     assert response.json()[0]['ingredients']==[{'name':'Gạo','quantity':'2,1 kg'}]
     assert 'menu' not in response.json()[0]
+
+
+def test_available_weekly_preview_has_ingredients_but_no_private_customer_fields(api):
+    from unittest.mock import AsyncMock
+    client,repo,_=api
+    repo.rpc_as_user=AsyncMock(return_value=[{'id':ORDER,'people':2,'meals':'dinner','price':449000,'wage':25000,'delivery_deadline':'2026-11-01T23:59:59+07:00','created_at':'2026-10-24T00:00:00+07:00','recipient_phone':'private','delivery_address':'private','week':{'id':ORDER,'week_start':'2026-11-02','delivery_deadline':'2026-11-01T23:59:59+07:00','menu':[{'name':'Gạo','quantity':'1 kg'}]}}])
+    response=client.get('/api/v1/weekly-food/available',params={'limit':25,'offset':0})
+    assert response.status_code==200
+    row=response.json()[0]
+    assert row['week']['ingredients']==[{'name':'Gạo','quantity':'1 kg'}]
+    assert 'private' not in response.text
+    assert 'recipientPhone' not in row and 'deliveryAddress' not in row
+    repo.rpc_as_user.assert_awaited_once_with('list_available_weekly_food_orders',payload={'page_limit':25,'page_offset':0},access_token='verified-token')
+
+
+def test_admin_week_list_includes_expired_weeks_and_order_counts(api):
+    from unittest.mock import AsyncMock
+    client, repo, _ = api
+    repo.rpc_as_user = AsyncMock(return_value={'items': [{'id': ORDER, 'week_start': '2000-01-03', 'delivery_deadline': '2000-01-02T23:59:59+07:00', 'menu': [{'name': 'Gạo', 'quantity': '1 kg'}], 'order_count': 2}], 'total': 26})
+    response = client.get('/api/v1/admin/weekly-weeks?page_offset=25&page_limit=25')
+    assert response.status_code == 200
+    assert response.json()['items'][0]['orderCount'] == 2
+    assert response.json()['items'][0]['ingredients'] == [{'name': 'Gạo', 'quantity': '1 kg'}]
+    assert 'menu' not in response.json()['items'][0]
+    assert response.json()['total'] == 26
+    repo.rpc_as_user.assert_awaited_once_with('admin_list_weekly_food_weeks', payload={'page_offset': 25, 'page_limit': 25}, access_token='verified-token')
+
+
+@pytest.mark.parametrize('params', [{'page_offset': -1}, {'page_limit': 101}, {'page_limit': 0}])
+def test_week_list_validates_pagination(api, params):
+    client, repo, _ = api
+    assert client.get('/api/v1/admin/weekly-weeks', params=params).status_code == 422
+    assert not any(c[0] == 'admin_list_weekly_food_weeks' for c in repo.calls)
+
+
+@pytest.mark.parametrize('path,method', [('/api/v1/admin/weekly-weeks', 'get'), (f'/api/v1/admin/weekly-weeks/{ORDER}/delete', 'post')])
+def test_week_management_rechecks_membership_on_every_request(api, path, method):
+    client, repo, _ = api
+    repo.member = False
+    assert getattr(client, method)(path).status_code == 403
+    assert not any(c[0] in ('admin_list_weekly_food_weeks', 'admin_delete_weekly_food_week') for c in repo.calls)
+    repo.member, repo.active = True, False
+    assert getattr(client, method)(path).status_code == 403
+
+
+def test_delete_week_uses_atomic_rpc_and_verified_token(api):
+    client, repo, _ = api
+    response = client.post(f'/api/v1/admin/weekly-weeks/{ORDER}/delete', json={})
+    assert response.status_code == 200
+    assert response.json() == {'id': ORDER}
+    assert repo.calls[-1] == ('admin_delete_weekly_food_week', {'target_week_id': ORDER}, 'verified-token')
+
+
+@pytest.mark.parametrize('error,status', [('week_has_orders', 409), ('week_not_found', 404), ('admin_required', 403)])
+def test_delete_week_reports_database_rejection(api, error, status):
+    client, repo, _ = api
+    repo.error = error
+    assert client.post(f'/api/v1/admin/weekly-weeks/{ORDER}/delete', json={}).status_code == status
+
+
+def test_delete_week_rejects_invalid_id_before_rpc(api):
+    client, repo, _ = api
+    assert client.post('/api/v1/admin/weekly-weeks/not-a-uuid/delete', json={}).status_code == 422
+    assert not any(c[0] == 'admin_delete_weekly_food_week' for c in repo.calls)

@@ -15,6 +15,8 @@ async def authorized_rpc(repository: SupabaseRepository, function: str, payload:
         messages = {
             'admin_required': (403, 'Bạn không còn quyền quản trị. Vui lòng đăng nhập lại.'),
             'account_inactive': (403, 'Tài khoản không hoạt động.'),
+            'week_not_found': (404, 'Gói nguyên liệu không còn tồn tại. Vui lòng tải lại.'),
+            'week_has_orders': (409, 'Không thể xóa gói đã có đơn đăng ký, kể cả đơn đã hủy hoặc hoàn tất.'),
             'order_not_found': (404, 'Không tìm thấy đơn hàng.'),
             'invalid_transition': (409, 'Đơn đã thay đổi hoặc chưa đủ điều kiện. Vui lòng tải lại.'),
             'cannot_reaccept': (409, 'Bạn đã hủy nhận và không thể nhận lại đơn này.'),

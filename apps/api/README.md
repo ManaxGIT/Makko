@@ -437,3 +437,18 @@ column and RPC `week_menu` argument for SQL compatibility. Their content is now 
 flat list of `{name, quantity}` objects, exposed as `ingredients` by the API.
 Migration `20261030175652_weekly_package_ingredients.sql` converts existing daily
 menus to summed ingredients without changing week/order IDs, dates or prices.
+
+Available weekly packages also include `week` using the existing weekly-catalogue
+shape (`ingredients`, dates and publication time), for pre-acceptance review.
+The eligibility RPC keeps the same owner/cutoff/previous-assignment filters and
+does not expose recipient names, phone numbers or exact delivery addresses.
+
+### Admin published weekly packages
+
+- `GET /api/v1/admin/weekly-weeks?page_offset=0&page_limit=25`: all published
+  consumption weeks, including expired ones, with `items`, `total`, flat
+  `ingredients` and `orderCount` (includes every order status).
+- `POST /api/v1/admin/weekly-weeks/{id}/delete`: atomic admin deletion of an
+  unused package; 409 if any order exists, 404 if missing. Never deletes orders.
+  Both API dependency and RPC verify active admin membership. Registration
+  and deletion serialize on the weekly-package row.

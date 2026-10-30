@@ -30,6 +30,15 @@ class WeeklyFoodWeek(ApiModel):
     published_at: datetime | None = None
 
 
+class AdminWeeklyFoodWeek(WeeklyFoodWeek):
+    order_count: int = Field(ge=0)
+
+
+class AdminWeeklyFoodWeekList(ApiModel):
+    items: list[AdminWeeklyFoodWeek]
+    total: int = Field(ge=0)
+
+
 class WeeklyFoodOrder(ApiModel):
     id: UUID
     customer_id: UUID
@@ -57,6 +66,7 @@ class WeeklyFoodDetail(WeeklyFoodOrder):
 
 
 class AvailableWeeklyFood(ApiModel):
+    week: WeeklyFoodWeek
     id: UUID
     people: int
     meals: Literal['lunch', 'dinner', 'both']

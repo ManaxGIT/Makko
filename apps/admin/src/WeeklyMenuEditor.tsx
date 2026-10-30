@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { WeeklyPackageList } from './WeeklyPackageList';
 import { api, ApiError, type MenuIngredient } from './api';
 import { emptyMenu, menuBody, menuDate, sameMenu, totalIngredients as aggregateIngredients, validateMenu, weekSchedule, type PublishedWeek, type WeekMenuBody } from './weeklyMenuForm';
 
@@ -42,7 +43,7 @@ export function WeeklyMenuEditor({ userId, onDenied }: { userId: string; onDenie
   const totals = aggregateIngredients(menu);
   const preview = <section className="panel ingredient-totals" aria-label="Tổng nguyên liệu trong gói"><h2>Tổng nguyên liệu trong gói</h2><p className="menu-help">Định lượng chuẩn cho 1 người, 1 bữa/ngày trong 7 ngày. Cộng các dòng cùng tên và đơn vị tương thích; định lượng chưa rõ được giữ riêng.</p>{!totals.grouped.length && !totals.separate.length && <p className="muted">Nhập nguyên liệu để xem tổng.</p>}{[...totals.grouped, ...totals.separate].map((v, i) => <div className="row" key={i}><b>{v.name}</b><span>{v.quantity}</span></div>)}</section>;
   return <section className="weekly-menu" aria-label="Nguyên liệu trong gói">
-    <div className="menu-step"><span className={step === 'edit' ? '' : 'inactive'}>01 · Nhập nguyên liệu</span><span className={step === 'review' ? '' : 'inactive'}>02 · Xem lại & công bố</span></div>
+    <WeeklyPackageList userId={userId} onDenied={onDenied} revision={publishedId}/><div id="new-week-editor" className="menu-step"><span className={step === 'edit' ? '' : 'inactive'}>01 · Nhập nguyên liệu</span><span className={step === 'review' ? '' : 'inactive'}>02 · Xem lại & công bố</span></div>
     {error && <div ref={errorBox} tabIndex={-1} className="error-strip" role="alert">{error}</div>}
     {publishedId && <div className="menu-success" role="status"><span className="tag green">Đã công bố</span><h2>Gói nguyên liệu đã sẵn sàng trên app</h2><p>Tuần bắt đầu {menuDate(Date.parse(weekStart + 'T00:00:00+07:00'))}. Khách có thể làm mới mục gói tuần để xem nguyên liệu và đăng ký.</p><button onClick={reset}>Tạo gói tuần khác</button></div>}
     {step === 'edit' ? <form onSubmit={review}><fieldset disabled={busy} className="menu-fieldset">

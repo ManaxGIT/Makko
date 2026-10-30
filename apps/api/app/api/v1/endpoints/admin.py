@@ -8,6 +8,7 @@ from app.dependencies.repositories import get_repository
 from app.models.user import CurrentUser
 from app.repositories.supabase import SupabaseRepository
 from app.schemas.admin import AdminOrderDetail, AdminOrderList, AdminSession, OrderType, PublishWeekBody
+from app.schemas.weekly_food import AdminWeeklyFoodWeekList
 from app.services.admin import AdminService, authorized_rpc
 
 router = APIRouter(prefix='/admin', tags=['admin'])
@@ -51,3 +52,23 @@ async def act(order_id: UUID, action: Literal['handover', 'pay-wage'], user: Adm
 @router.post('/weekly-weeks', status_code=201)
 async def publish_week(body: PublishWeekBody, user: Admin, repository: Repository) -> dict:
     return await AdminService(repository).publish_week(body, user.access_token)
+
+
+@router.get('/weekly-weeks', response_model=AdminWeeklyFoodWeekList, response_model_by_alias=True)
+async def list_weeks(
+    user: Admin, repository: Repository,
+    page_offset: Annotated[int, Query(ge=0)] = 0,
+    page_limit: Annotated[int, Query(ge=1, le=100)] = 25,
+) -> AdminWeeklyFoodWeekList:
+    result = await authorized_rpc(repository, 'admin_list_weekly_food_weeks', {
+        'page_offset': page_offset, 'page_limit': page_limit,
+    }, user.access_token)
+    return AdminWeeklyFoodWeekList(**result)
+
+
+@router.post('/weekly-weeks/{week_id}/delete')
+async def delete_week(week_id: UUID, user: Admin, repository: Repository) -> dict:
+    result = await authorized_rpc(repository, 'admin_delete_weekly_food_week', {
+        'target_week_id': str(week_id),
+    }, user.access_token)
+    return {'id': result}

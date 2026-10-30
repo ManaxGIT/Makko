@@ -82,6 +82,21 @@ The editor never inserts demonstration data automatically. The mobile app reads
 published ingredients through FastAPI; the HTML prototype has no live writes.
 Admin itself neither fabricates orders nor changes live customer orders for QA.
 
+### List and delete published packages
+
+**Nguyên liệu trong gói** lists all published weeks, including expired weeks,
+with pagination (25 per page), full ingredient preview, and order counts.
+Refresh preserves loaded content on errors. Publishing refreshes the list.
+`GET /api/v1/admin/weekly-weeks` accepts `page_offset` and `page_limit` (1–100).
+
+**Xóa gói** requires confirmation and is available only for packages with zero
+orders. `POST /api/v1/admin/weekly-weeks/{id}/delete` rechecks current active
+admin membership and locks the week in PostgreSQL. Registration holds a matching
+key-share lock, so a concurrent registration and deletion cannot both succeed.
+Any order, including cancelled/completed orders, prevents deletion. Existing
+orders and history are never cascaded or changed. A missing package returns 404;
+a package that gained an order returns 409 and the web refreshes its count.
+
 ## Checks and build
 
 ```sh
