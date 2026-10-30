@@ -57,7 +57,7 @@ export function CreateRequestScreen({ step }: { step: 1 | 2 | 3 | 4 }) {
     if (!item) return;
     const quantity = Number(item.quantity.replace(',', '.'));
     if (!item.name.trim() || !Number.isFinite(quantity) || quantity <= 0 || !/^\d+(?:[.,]\d{1,3})?$/.test(item.quantity)) {
-      setModalError('Nhập tên món và số lượng lớn hơn 0 (tối đa 3 số thập phân).'); return;
+      setModalError('Nhập tên vật phẩm và số lượng lớn hơn 0 (tối đa 3 số thập phân).'); return;
     }
     if (!item.unit.trim()) { setModalError('Vui lòng nhập đơn vị mua.'); return; }
     const saved = { ...item, name: item.name.trim(), unit: item.unit.trim(), note: item.note.trim() };
@@ -69,7 +69,7 @@ export function CreateRequestScreen({ step }: { step: 1 | 2 | 3 | 4 }) {
     if (step === 1) {
       const titleLength = Array.from((form.title ?? '').trim()).length;
       if (titleLength && (titleLength < 3 || titleLength > 120)) { setError('Tiêu đề cần từ 3 đến 120 ký tự.'); return; }
-      if (!form.items.length) { setError('Thêm ít nhất một món để tiếp tục.'); return; }
+      if (!form.items.length) { setError('Thêm ít nhất một vật phẩm để tiếp tục.'); return; }
       router.push(route('delivery'));
     } else if (step === 2) {
       if (!isDeliveryAddressComplete(form)) { setError('Chọn tỉnh/thành, xã/phường và nhập số nhà, tên đường, số điện thoại liên hệ.'); return; }
@@ -91,7 +91,7 @@ export function CreateRequestScreen({ step }: { step: 1 | 2 | 3 | 4 }) {
   if (editId && (editLoading || editError)) return <SafeAreaView style={s.safe}><View style={s.content}><Action label="Quay lại Đơn hàng" onPress={() => router.dismissTo('/(tabs)/orders')} /><Text style={s.description}>{editLoading ? 'Đang tải đơn hàng…' : editError}</Text>{!!editError && <Action label="Thử tải lại" onPress={reloadEdit} />}</View></SafeAreaView>;
   if (step === 4 && !publishedRequest) return <Redirect href="/create/items" />;
   const heading = ['Hôm nay mua gì?', 'Giao đến bạn.', editId ? 'Kiểm tra thay đổi.' : 'Mọi thứ đã\nđúng ý bạn?', 'Đã đăng yêu cầu.'][step - 1];
-  const intro = ['Thêm những món bạn cần, Makko giúp bạn kết nối với người đi chợ.', 'Chọn nơi nhận và thời gian bạn cần hàng.', editId ? 'Kiểm tra thông tin trước khi lưu vào đơn hiện tại.' : 'Kiểm tra thông tin lần cuối trước khi nhờ đi chợ.', 'Bạn có thể theo dõi người nhận và tiến trình trong Đơn hàng.'][step - 1];
+  const intro = ['Thêm những vật phẩm bạn cần, Makko giúp bạn kết nối với người đi chợ.', 'Chọn nơi nhận và thời gian bạn cần hàng.', editId ? 'Kiểm tra thông tin trước khi lưu vào đơn hiện tại.' : 'Kiểm tra thông tin lần cuối trước khi nhờ đi chợ.', 'Bạn có thể theo dõi người nhận và tiến trình trong Đơn hàng.'][step - 1];
   return <SafeAreaView style={s.safe} edges={['top', 'bottom']}><Stack.Screen options={{ gestureEnabled: !requestLocked }} /><KeyboardAvoidingView style={s.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
     <View style={s.header}>{step < 4 && <Pressable accessibilityRole="button" accessibilityLabel="Quay lại" onPress={goBack} disabled={requestLocked} hitSlop={7} style={({ pressed }) => [s.backButton, pressed && { opacity: 0.62 }]}><SymbolView name={{ ios: 'chevron.left', android: 'chevron_left', web: 'chevron_left' }} size={19} tintColor="#000000" /></Pressable>}<Text style={s.headerTitle}>{editId ? 'Chỉnh sửa yêu cầu' : 'Đăng yêu cầu'}</Text><Text style={s.small}>{step === 4 ? 'Hoàn tất' : `Bước ${step} / 3`}</Text></View>
     <View style={s.progress}>{[1, 2, 3].map(i => <View key={i} style={[s.segment, i <= step && (step === 3 ? s.reviewActiveSegment : s.activeSegment)]} />)}</View>
@@ -101,12 +101,12 @@ export function CreateRequestScreen({ step }: { step: 1 | 2 | 3 | 4 }) {
       <Text style={[s.heading, step === 4 && s.center]}>{heading}</Text><Text style={[s.description, step === 4 && s.center]}>{intro}</Text>
       {step === 1 && <>
         <Field label="Tiêu đề yêu cầu · Không bắt buộc" value={form.title ?? ''} onChangeText={title => patch({ title })} maxLength={120} placeholder="Ví dụ: Trái cây cho cả nhà" />
-        <Text style={s.small}>Để trống để tự đặt tiêu đề từ các món. Nếu nhập, dùng từ 3 đến 120 ký tự.</Text>
-        <View style={s.sectionRow}><Text style={s.bold}>Món cần mua</Text><Text style={s.bold}>{form.items.length} món</Text></View>
+        <Text style={s.small}>Để trống để tự đặt tiêu đề từ các vật phẩm. Nếu nhập, dùng từ 3 đến 120 ký tự.</Text>
+        <View style={s.sectionRow}><Text style={s.bold}>Vật phẩm cần mua</Text><Text style={s.bold}>{form.items.length} vật phẩm</Text></View>
         {form.items.map(i => <View key={i.id} style={[s.card, s.row]}><View style={s.cart}><Text style={s.cartText}>🛒</Text></View><View style={s.flex}><Text style={s.bold}>{i.name}</Text><Text style={s.small}>{i.quantity} {i.unit}{i.note ? ` · ${i.note}` : ''}</Text></View><Action label="Sửa" onPress={() => openItem(i)} /><Action label="Xóa" danger onPress={() => patch({ items: form.items.filter(row => row.id !== i.id) })} /></View>)}
-        {!form.items.length && <Text style={s.description}>Danh sách còn trống. Thêm món đầu tiên bên dưới.</Text>}
-        <Pressable accessibilityRole="button" onPress={() => openItem()} style={s.add}><Text style={s.bold}>＋ Thêm món</Text></Pressable>
-        <View style={s.soft}><Text style={s.bold}>Chốt tiền trước khi đăng.</Text><Text style={s.description}>Ghi đủ món và số lượng. Bạn sẽ chốt tiền mua hàng cho cả giỏ ở bước tiếp theo.</Text></View>
+        {!form.items.length && <Text style={s.description}>Danh sách còn trống. Thêm vật phẩm đầu tiên bên dưới.</Text>}
+        <Pressable accessibilityRole="button" onPress={() => openItem()} style={s.add}><Text style={s.bold}>＋ Thêm vật phẩm</Text></Pressable>
+        <View style={s.soft}><Text style={s.bold}>Chốt tiền trước khi đăng.</Text><Text style={s.description}>Ghi đủ vật phẩm và số lượng. Bạn sẽ chốt tiền mua hàng cho cả giỏ ở bước tiếp theo.</Text></View>
 
       </>}
       {step === 2 && <>
@@ -119,13 +119,13 @@ export function CreateRequestScreen({ step }: { step: 1 | 2 | 3 | 4 }) {
         <Field label="Tiền mua hàng đã thỏa thuận (đ)" value={moneyInput(form.budget)} onChangeText={v => patch({ budget: v.replace(/\D/g, '').slice(0, 10) })} placeholder="Ví dụ: 150.000" keyboardType="number-pad" />
         <Text style={s.small}>Số tiền cho cả giỏ, chưa gồm phí đi chợ. Người nhận giữ phần tiết kiệm và chịu phần vượt khi mua đủ, đúng yêu cầu.</Text>
         <Field label="Phí đi chợ bạn đề nghị (đ)" value={moneyInput(form.fee)} onChangeText={v => patch({ fee: v.replace(/\D/g, '').slice(0, 10) })} keyboardType="number-pad" />
-        <View style={s.soft}><View style={s.sectionRow}><Text style={s.body}>Tổng tiền sẽ chốt</Text><Text style={s.totalText}>{form.budget ? money(Number(form.budget) + Number(form.fee)) : 'Chưa xác định'}</Text></View><Text style={s.small}>Gồm tiền mua hàng và phí đi chợ. Thiếu hoặc thay món cần bạn đồng ý và điều chỉnh tiền.</Text></View>
+        <View style={s.soft}><View style={s.sectionRow}><Text style={s.body}>Tổng tiền sẽ chốt</Text><Text style={s.totalText}>{form.budget ? money(Number(form.budget) + Number(form.fee)) : 'Chưa xác định'}</Text></View><Text style={s.small}>Gồm tiền mua hàng và phí đi chợ. Thiếu hoặc thay vật phẩm cần bạn đồng ý và điều chỉnh tiền.</Text></View>
         <Text style={s.label}>Thanh toán</Text><View style={s.row}><Choice label="Tiền mặt" selected={form.payment === 'cash'} onPress={() => patch({ payment: 'cash' })} /><Choice label="Chuyển khoản" selected={form.payment === 'bank_transfer'} onPress={() => patch({ payment: 'bank_transfer' })} /></View>
         <Field label="Lưu ý giao hàng · Không bắt buộc" value={form.deliveryNote} onChangeText={deliveryNote => patch({ deliveryNote })} multiline placeholder="Ví dụ: Gọi mình khi đến sảnh." maxLength={500} />
       </>}
       {step === 3 && <>
         <View style={s.reviewTitleBlock}><Text style={s.small}>Tiêu đề yêu cầu</Text><Text style={s.reviewTitle}>{(form.title ?? '').trim() || `Đi chợ: ${form.items.map(item => item.name.trim()).join(', ')}`.slice(0, 120)}</Text></View>
-        <View style={s.reviewSection}><Text style={s.bold}>Món cần mua</Text><Text style={s.small}>{form.items.length} món</Text></View>
+        <View style={s.reviewSection}><Text style={s.bold}>Vật phẩm cần mua</Text><Text style={s.small}>{form.items.length} vật phẩm</Text></View>
         <View style={s.reviewCard}>{form.items.map((i, index) => <View key={i.id} style={[s.reviewItem, index < form.items.length - 1 && s.reviewDivider]}>
           <View style={s.reviewItemHead}><Text style={[s.bold, s.flex]}>{i.name}</Text><Text style={s.reviewQuantity}>{i.quantity} {i.unit}</Text></View>
           <Text style={s.reviewItemNote}>{i.note ? `${i.note} · ` : ''}{i.allowSubstitution ? 'Có thể đề xuất loại tương tự, cần xác nhận' : 'Không tự thay loại khác'}</Text>
@@ -138,7 +138,7 @@ export function CreateRequestScreen({ step }: { step: 1 | 2 | 3 | 4 }) {
           <ReviewDetail label="Thanh toán" value={form.payment === 'cash' ? 'Tiền mặt' : 'Chuyển khoản'} last={!form.deliveryNote.trim()} />
           {!!form.deliveryNote.trim() && <ReviewDetail label="Lưu ý giao hàng" value={form.deliveryNote} last />}
         </View>
-        <View style={s.reviewPrices}><View style={s.reviewPriceRow}><Text style={[s.body, s.flex]}>Tiền hàng đã thỏa thuận</Text><Text style={s.bold}>{form.budget ? money(form.budget) : 'Chưa nhập'}</Text></View><View style={s.reviewPriceRow}><Text style={[s.body, s.flex]}>Phí đi chợ</Text><Text style={s.bold}>{money(form.fee)}</Text></View><Text style={s.small}>Tiền hàng cố định, tách riêng phí đi chợ. Mua đủ, đúng yêu cầu: người nhận giữ phần tiết kiệm và chịu phần vượt. Thiếu hoặc thay món cần bạn đồng ý và điều chỉnh tiền.</Text></View>
+        <View style={s.reviewPrices}><View style={s.reviewPriceRow}><Text style={[s.body, s.flex]}>Tiền hàng đã thỏa thuận</Text><Text style={s.bold}>{form.budget ? money(form.budget) : 'Chưa nhập'}</Text></View><View style={s.reviewPriceRow}><Text style={[s.body, s.flex]}>Phí đi chợ</Text><Text style={s.bold}>{money(form.fee)}</Text></View><Text style={s.small}>Tiền hàng cố định, tách riêng phí đi chợ. Mua đủ, đúng yêu cầu: người nhận giữ phần tiết kiệm và chịu phần vượt. Thiếu hoặc thay vật phẩm cần bạn đồng ý và điều chỉnh tiền.</Text></View>
         <Text style={s.small}>Cần thay đổi thông tin? Quay lại bước trước.{editId ? '\nThay đổi chỉ được lưu khi đơn chưa có người nhận.' : ''}</Text>
       </>}
       {step === 4 && <View style={s.soft}><Text style={[s.body, s.center]}>Yêu cầu đã được lưu và đăng thành công. Bạn có thể theo dõi trong Đơn hàng.</Text></View>}
@@ -147,8 +147,8 @@ export function CreateRequestScreen({ step }: { step: 1 | 2 | 3 | 4 }) {
     <View style={s.footer}>{step === 3 && <View style={s.reviewFooterTotal}><Text style={s.small}>Tổng thanh toán</Text><Text style={s.reviewTotal}>{form.budget ? money(Number(form.budget) + Number(form.fee)) : 'Chưa xác định'}</Text></View>}{step === 4 && <Action label="Xem đơn hàng" onPress={() => router.replace('/(tabs)/orders')} />}<Pressable accessibilityRole="button" onPress={proceed} disabled={publishing} accessibilityState={{ disabled: publishing, busy: publishing }} style={[s.primary, publishing && { opacity: 0.6 }]}><Text style={s.primaryText}>{step === 4 ? 'Tạo yêu cầu khác' : publishing ? editId ? 'Đang lưu…' : 'Đang đăng…' : step === 3 ? requestLocked ? 'Thử lại' : editId ? 'Lưu thay đổi' : 'Xác nhận & đăng yêu cầu' : 'Tiếp tục →'}</Text></Pressable><Text style={[s.small, s.footerHint]}>{step === 1 ? 'Tiếp theo: địa chỉ, thời gian và chi phí' : step === 2 ? 'Tiếp theo: kiểm tra thông tin' : step === 4 ? 'Đã đăng thành công' : 'Kiểm tra thông tin trước khi lưu'}</Text></View>
   </KeyboardAvoidingView>
   <Modal visible={!!item} transparent animationType="slide" onRequestClose={closeEditor}><View style={s.overlay}><SafeAreaView style={s.modalSafe}><KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={s.modal}>
-    <View style={s.sectionRow}><Text style={s.bold}>Thông tin món</Text><Action label="Đóng" onPress={closeEditor} /></View>
-    {item ? <><Field label="Tên món" value={item.name} onChangeText={name => setItem({ ...item, name })} maxLength={160} placeholder="Ví dụ: Thịt heo nạc vai" /><Field label="Số lượng" value={item.quantity} onChangeText={quantity => setItem({ ...item, quantity })} keyboardType="decimal-pad" /><Text style={s.label}>Đơn vị</Text><View style={s.wrap}>{units.map(unit => <Choice key={unit} label={unit} selected={!customUnit && item.unit === unit} onPress={() => { setCustomUnit(false); setItem({ ...item, unit }); }} />)}<Choice label="Khác" selected={customUnit} onPress={() => { setCustomUnit(true); if (!customUnit) setItem({ ...item, unit: '' }); }} /></View>{customUnit && <Field label="Đơn vị tự nhập" value={item.unit} onChangeText={unit => setItem({ ...item, unit })} placeholder="Ví dụ: nải, lon, mớ…" maxLength={30} />}<Field label="Dặn người mua · Không bắt buộc" value={item.note} onChangeText={note => setItem({ ...item, note })} multiline maxLength={500} /><View style={s.row}><Switch accessibilityLabel="Cho phép đề xuất loại tương tự" value={item.allowSubstitution} onValueChange={allowSubstitution => setItem({ ...item, allowSubstitution })} /><Text style={[s.body, s.flex]}>Có thể đề xuất loại tương tự nếu hết hàng (cần bạn xác nhận)</Text></View></> : null}
+    <View style={s.sectionRow}><Text style={s.bold}>Thông tin vật phẩm</Text><Action label="Đóng" onPress={closeEditor} /></View>
+    {item ? <><Field label="Tên vật phẩm" value={item.name} onChangeText={name => setItem({ ...item, name })} maxLength={160} placeholder="Ví dụ: Thịt heo nạc vai" /><Field label="Số lượng" value={item.quantity} onChangeText={quantity => setItem({ ...item, quantity })} keyboardType="decimal-pad" /><Text style={s.label}>Đơn vị</Text><View style={s.wrap}>{units.map(unit => <Choice key={unit} label={unit} selected={!customUnit && item.unit === unit} onPress={() => { setCustomUnit(false); setItem({ ...item, unit }); }} />)}<Choice label="Khác" selected={customUnit} onPress={() => { setCustomUnit(true); if (!customUnit) setItem({ ...item, unit: '' }); }} /></View>{customUnit && <Field label="Đơn vị tự nhập" value={item.unit} onChangeText={unit => setItem({ ...item, unit })} placeholder="Ví dụ: nải, lon, mớ…" maxLength={30} />}<Field label="Dặn người mua · Không bắt buộc" value={item.note} onChangeText={note => setItem({ ...item, note })} multiline maxLength={500} /><View style={s.row}><Switch accessibilityLabel="Cho phép đề xuất loại tương tự" value={item.allowSubstitution} onValueChange={allowSubstitution => setItem({ ...item, allowSubstitution })} /><Text style={[s.body, s.flex]}>Có thể đề xuất loại tương tự nếu hết hàng (cần bạn xác nhận)</Text></View></> : null}
     {!!modalError && <Text accessibilityRole="alert" style={s.error}>{modalError}</Text>}<Pressable accessibilityRole="button" style={s.primary} onPress={saveItem}><Text style={s.primaryText}>Xong</Text></Pressable>
   </ScrollView></KeyboardAvoidingView></SafeAreaView></View></Modal>
   {addressOpen && <AddressPicker currentId={form.savedAddress?.id} onClose={() => setAddressOpen(false)} onSelect={selectDeliveryAddress} />}

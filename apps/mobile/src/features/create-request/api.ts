@@ -22,12 +22,12 @@ export function buildRequestBody(form: RequestForm, submissionKey: string, now =
   const title = (form.title ?? '').trim();
   if (title && (Array.from(title).length < 3 || Array.from(title).length > 120)) throw new Error('Tiêu đề cần từ 3 đến 120 ký tự.');
   if (!form.savedAddress?.id && !(editing && form.orderAddress)) throw new Error('Vui lòng lưu địa chỉ nhận hàng trước khi đăng.');
-  if (!form.items.length || form.items.length > 100) throw new Error('Danh sách cần có từ 1 đến 100 món.');
+  if (!form.items.length || form.items.length > 100) throw new Error('Danh sách cần có từ 1 đến 100 vật phẩm.');
   const items = form.items.map(item => {
     const quantity = item.quantity.replace(',', '.');
     if (!item.name.trim() || item.name.trim().length > 160 || !item.unit.trim() || item.unit.trim().length > 30
       || !/^\d+(?:\.\d{1,3})?$/.test(quantity) || Number(quantity) <= 0 || Number(quantity) >= 10000000
-      || item.note.length > 500) throw new Error('Kiểm tra tên món, số lượng và đơn vị mua.');
+      || item.note.length > 500) throw new Error('Kiểm tra tên vật phẩm, số lượng và đơn vị mua.');
     return { name: item.name.trim(), quantity, unit: item.unit.trim(), note: item.note.trim() || null, allowSubstitution: item.allowSubstitution };
   });
   if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(form.time)) throw new Error('Giờ giao cần có định dạng HH:mm.');
