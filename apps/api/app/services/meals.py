@@ -106,6 +106,8 @@ class MealService:
             raise HTTPException(502, 'Chưa kết nối được trợ lý bữa ăn. Vui lòng thử lại.') from error
         if response.status_code == 429:
             raise HTTPException(429, 'AI đang hết hạn mức hoặc bận. Vui lòng thử lại sau.')
+        if response.status_code == 503:
+            raise HTTPException(502, 'AI đang quá tải nên chưa thể gợi ý món ăn. Vui lòng thử lại sau ít phút.')
         if response.status_code != 200:
             # Do not pass provider errors, credentials or request text to the client.
             raise HTTPException(502, 'Trợ lý bữa ăn tạm thời không khả dụng. Vui lòng thử lại sau.')

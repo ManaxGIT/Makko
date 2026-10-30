@@ -71,6 +71,22 @@ async def test_provider_errors_are_sanitized(status, expected):
 
 
 @pytest.mark.asyncio
+async def test_provider_overload_is_explained_without_retrying():
+    calls = 0
+    def handler(request):
+        nonlocal calls
+        calls += 1
+        return httpx.Response(503, json={'error': {'message': 'secret'}})
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        with pytest.raises(HTTPException) as error:
+            await MealService(settings(), client).suggest(prefs)
+    assert error.value.status_code == 502
+    assert 'quá tải' in error.value.detail
+    assert 'secret' not in error.value.detail
+    assert calls == 1
+
+
+@pytest.mark.asyncio
 async def test_timeout_and_missing_configuration():
     def timeout(request):
         raise httpx.ReadTimeout('secret', request=request)
