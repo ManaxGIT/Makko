@@ -12,9 +12,9 @@ export const supabase = createClient(
   supabasePublishableKey ?? 'not-configured',
   {
     auth: {
-      storage: AsyncStorage,
+      storage: Platform.OS === 'web' && typeof window === 'undefined' ? undefined : AsyncStorage,
       autoRefreshToken: true,
-      persistSession: true,
+      persistSession: Platform.OS !== 'web' || typeof window !== 'undefined',
       detectSessionInUrl: Platform.OS === 'web',
     },
   },

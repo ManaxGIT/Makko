@@ -139,3 +139,46 @@ test('cleared profile caches cannot be restored by reads or a late save', async 
   assert.equal(await read, null);
   assert.equal(c.accountProfileEntry('alice').data, undefined);
 });
+
+test('weekly resources deduplicate empty reads and isolate accounts', async () => {
+  const c=cache(), request=deferred();let reads=0;
+  const load=()=>{reads++;return request.promise};
+  const first=c.fetchWeeklyResource('alice','orders:customer',load);
+  const second=c.fetchWeeklyResource('alice','orders:customer',load);
+  request.resolve([]);await Promise.all([first,second]);
+  assert.equal(reads,1);
+  assert.equal(c.weeklyResourceEntry('alice','orders:customer').data.length,0);
+  assert.equal(c.weeklyResourceEntry('bob','orders:customer').data,undefined);
+});
+
+test('confirmed weekly mutation patches lists, rejects late reads and preserves server timestamps', async () => {
+  const c=cache(), request=deferred();
+  await c.fetchWeeklyResource('alice','detail:one',async()=>({id:'one',status:'accepted',handoverAt:null}));
+  const reading=c.fetchWeeklyResource('alice','detail:one',()=>request.promise);
+  c.patchWeeklyResourceOrder('alice','one','delivering');
+  request.resolve({id:'one',status:'accepted',handoverAt:null});
+  assert.equal(await reading,null);
+  const entry=c.weeklyResourceEntry('alice','detail:one');
+  assert.equal(entry.data.status,'delivering');assert.equal(entry.data.handoverAt,null);
+  assert.equal(entry.updatedAt,0);
+});
+
+test('weekly release evicts recipient detail and assigned list and never reoffers the order', async () => {
+  const c=cache();
+  for(const key of ['orders:shopper','available:0'])await c.fetchWeeklyResource('alice',key,async()=>[{id:'one',status:'accepted'}]);
+  await c.fetchWeeklyResource('alice','detail:one',async()=>({id:'one',status:'accepted',deliveryAddress:'private'}));
+  c.patchWeeklyResourceOrder('alice','one','registered');
+  assert.equal(c.weeklyResourceEntry('alice','detail:one').data,undefined);
+  assert.equal(c.weeklyResourceEntry('alice','orders:shopper').data.length,0);
+  assert.equal(c.weeklyResourceEntry('alice','available:0').data.length,0);
+});
+
+test('weekly refresh failure keeps content and logout prevents in-flight data restoring it', async () => {
+  const c=cache(), request=deferred();
+  await c.fetchWeeklyResource('alice','weeks',async()=>[{id:'week'}]);
+  await assert.rejects(c.fetchWeeklyResource('alice','weeks',async()=>{throw Error('offline')}));
+  assert.equal(c.weeklyResourceEntry('alice','weeks').data[0].id,'week');
+  const read=c.fetchWeeklyResource('alice','weeks',()=>request.promise);
+  c.clearOrderLists();request.resolve([{id:'private'}]);assert.equal(await read,null);
+  assert.equal(c.weeklyResourceEntry('alice','weeks').data,undefined);
+});

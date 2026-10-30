@@ -240,6 +240,7 @@ function OrderList({ history, userId }: { history: boolean; userId: string }) {
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
       >
+        {!history && <Pressable accessibilityRole="button" onPress={() => router.push('/weekly-food/orders')} style={{ padding: 16, borderWidth: 1, borderColor: colors.border, borderRadius: 16, backgroundColor: colors.cream, marginBottom: 16 }}><Text style={{ fontFamily: fontFamilies.bodyBold, fontSize: fontSizes.body, lineHeight: lineHeights.body, color: colors.forest }}>Gói nguyên liệu tuần →</Text><Text style={{ fontFamily: fontFamilies.body, fontSize: fontSizes.bodySmall, lineHeight: lineHeights.bodySmall, color: colors.muted }}>Theo dõi gói đã đăng ký hoặc nhận giao gói Makko.</Text></Pressable>}
         {loading ? <View style={styles.emptyState}><ActivityIndicator color={colors.coral} /><Text style={styles.emptyDescription}>Đang tải đơn hàng...</Text></View> : error && !loaded ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyTitle}>Không thể tải đơn hàng</Text>

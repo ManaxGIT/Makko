@@ -12,6 +12,7 @@ import { useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { WeeklyFoodEntry } from '@/features/weekly-food/WeeklyFoodEntry';
 import { MealPlate } from '@/features/meals/MealPlate';
 import { getHomeDashboard, HomeDashboard } from '@/features/home/api';
 import { useNearbyLocation } from '@/features/location/LocationProvider';
@@ -163,6 +164,8 @@ export default function HomeScreen() {
           <View style={styles.mealCopy}><Text style={styles.mealEyebrow}>TRỢ LÝ BỮA ĂN ✧</Text><Text style={styles.mealHeading}>Hôm nay{`\n`}ăn gì?</Text><Text style={styles.mealDescription}>Một chút cảm hứng.{`\n`}Một bữa ngon đúng ý.</Text><Pressable accessibilityRole="button" onPress={() => router.push('/today-meal')} style={({ pressed }) => [styles.mealButton, pressed && styles.pressed]}><Text style={styles.mealButtonText}>Gợi ý cho mình →</Text></Pressable></View>
           <View pointerEvents="none" style={styles.mealArt}><MealPlate /></View>
         </View>
+
+        <WeeklyFoodEntry />
 
         <View style={styles.actions}>
           <ActionCard

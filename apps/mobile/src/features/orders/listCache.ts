@@ -10,7 +10,7 @@ export function orderListEntry(userId: string, scope: Scope): Entry {
   if (!entry) { entry = { updatedAt: 0, version: 0 }; entries.set(key, entry); }
   return entry;
 }
-export function clearOrderLists() { entries.clear(); reputationEntries.clear(); profileEntries.clear(); avatarUrls.clear(); }
+export function clearOrderLists() { entries.clear(); reputationEntries.clear(); profileEntries.clear(); avatarUrls.clear(); weeklyEntries.clear(); }
 export function invalidateOrderLists() {
   for (const entry of profileEntries.values()) { entry.updatedAt = 0; entry.version += 1; entry.pending = undefined; }
   for (const entry of reputationEntries.values()) { entry.updatedAt = 0; entry.version += 1; entry.pending = undefined; }
@@ -111,4 +111,37 @@ export function cachedAvatarUrl(userId: string, path: string, load: () => Promis
   }).finally(() => { if (target.pending === pending) target.pending = undefined; });
   target.pending = pending;
   return pending;
+}
+
+// Weekly food follows the same account-scoped, versioned cache lifecycle.
+type WeeklyEntry = { data?: unknown; updatedAt: number; version: number; pending?: Promise<unknown> };
+const weeklyEntries = new Map<string, WeeklyEntry>();
+export function weeklyResourceEntry<T>(userId: string, resource: string) {
+  const key = `${userId}:${resource}`;
+  let entry = weeklyEntries.get(key);
+  if (!entry) { entry = { updatedAt: 0, version: 0 }; weeklyEntries.set(key, entry); }
+  return entry as { data?: T; updatedAt: number; version: number; pending?: Promise<T | null> };
+}
+export function fetchWeeklyResource<T>(userId: string, resource: string, load: () => Promise<T>): Promise<T | null> {
+  const key = `${userId}:${resource}`, entry = weeklyResourceEntry<T>(userId, resource);
+  if (entry.pending) return entry.pending;
+  const version = entry.version;
+  const pending = load().then(data => {
+    if (weeklyEntries.get(key) !== entry || version !== entry.version) return null;
+    entry.data = data; entry.updatedAt = Date.now(); return data;
+  }).finally(() => { if (entry.pending === pending) entry.pending = undefined; });
+  entry.pending = pending; return pending;
+}
+export function invalidateWeeklyResources(userId: string) {
+  for (const [key, entry] of weeklyEntries) if (key.startsWith(`${userId}:`) && key !== `${userId}:weeks`) { entry.updatedAt = 0; entry.version++; entry.pending = undefined; }
+}
+export function patchWeeklyResourceOrder(userId: string, id: string, status: string) {
+  invalidateWeeklyResources(userId);
+  for (const [key, entry] of weeklyEntries) {
+    if (!key.startsWith(`${userId}:`) || !entry.data) continue;
+    const patch = (row: unknown) => row && typeof row === 'object' && 'id' in row && row.id === id && 'status' in row ? { ...row, status } : row;
+    if (status === 'registered' && key === `${userId}:detail:${id}`) { weeklyEntries.delete(key); continue; }
+    if (Array.isArray(entry.data)) entry.data = key.includes(':available:') || (status === 'registered' && key.endsWith(':orders:shopper')) ? entry.data.filter(row => row.id !== id) : entry.data.map(patch);
+    else entry.data = patch(entry.data);
+  }
 }
