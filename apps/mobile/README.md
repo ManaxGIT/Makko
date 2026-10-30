@@ -205,14 +205,21 @@ trả một bản ghi theo API cũ, nên cập nhật cục bộ rồi đánh d�
 
 The home entry opens `/weekly-food`. The flow includes package selection (1–4
 people; lunch, dinner, both), the published package ingredients, `/weekly-food/checkout`
-using the existing saved-address popup, `/weekly-food/orders` for customer,
-assigned-shopper and available-delivery lists, and `/weekly-food/[id]` for tracking.
-The Orders tab also links to the weekly list. Every weekly route is session-guarded.
+using the existing saved-address popup and `/weekly-food/[id]` for tracking.
+Customer and shopper packages are listed in the shared Orders tab; completed and
+cancelled packages are in Account → Order history. Available packages are in
+Explore. The old `/weekly-food/orders` list now redirects to the Orders tab;
+there is no separate package-list shortcut. Every weekly route is session-guarded.
 
 Reads/writes use `/api/v1/weekly-food` on FastAPI with the current account ID
 checked by the shared HTTP client. Only the one-week cash plan is enabled. The
-app automatically uses the earliest published week whose seven-day registration
-cutoff has not passed; users select no delivery day or time. An empty catalogue
+app lists published consumption weeks and defaults once to the earliest one
+whose seven-day registration cutoff has not passed. Users can choose a different
+week and review its ingredients, deadline and registration cutoff. Each week card opens its own ingredient preview. Weeks past the registration
+cutoff are hidden from this picker; stored weeks and existing orders are retained. Refresh
+keeps the selection; a removed selected week requires explicit reselection.
+Checkout receives and displays the selected week ID/range. Users still select no
+delivery day or time. An empty catalogue
 shows that registrations are not open, rather than introducing a demo ingredient list.
 Publish real ingredient lists with the admin web/API before testing registrations against live data.
 
@@ -244,11 +251,21 @@ Free-form legacy quantities show the original text and multiplier instead of an
 invented numeric amount; publication should use numeric amounts with units.
 
 Explore now separates **Đơn nhờ đi chợ** and **Gói nguyên liệu** with tabs and
-explicit card labels. Weekly delivery is accepted directly in Explore through
-the existing weekly `accept` API, then opens the assigned order. Weekly results
+explicit card labels. Weekly cards open a shared ingredient/amount preview first. Only **Xác nhận nhận
+giao** calls the existing weekly `accept` API and opens the assigned order. Weekly results
 cover Da Nang and do not use the errand keyword/location filters. The two lists
 keep their own scroll areas and state; pull-to-refresh applies to the visible
 list. Weekly pages reuse the existing account-scoped `available:<page>` cache
 (30-second freshness, 25 rows/page), shared with the weekly-orders screen. Server
 ownership, cutoff and assignment checks remain authoritative. The weekly-order
 card component is shared by both entry points; no sample orders are inserted.
+
+Order lists and Account → Order history now merge errand requests and weekly
+packages under their existing customer/shopper tabs, including badge counts.
+`delivered` stays active until customer confirmation; completed/cancelled packages
+appear in history. The feeds reuse each account's existing errand and weekly
+caches. Pull-to-refresh refreshes both sources without clearing usable cards.
+Available-package previews show published ingredients scaled to that package,
+advance/collection/wage amounts and Da Nang delivery scope; customer contact and
+exact address remain restricted to the assigned-order detail. Both Explore and
+the weekly-orders entry use the same preview and explicit confirmation.

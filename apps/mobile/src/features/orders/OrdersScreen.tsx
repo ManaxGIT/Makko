@@ -1,3 +1,7 @@
+import { getFoodOrders, type FoodOrder } from '@/features/weekly-food/api';
+import { useFoodResource } from '@/features/weekly-food/useFoodResource';
+import { WeeklyOrderCard } from '@/features/weekly-food/WeeklyOrderCard';
+import { buildOrderFeed } from './orderFeed';
 import { AvatarImage } from '@/components/ui/AvatarImage';
 import { OrderScreenHeader } from './OrderScreenHeader';
 import { RecipeLink } from '@/features/meals/RecipeLink';
@@ -120,6 +124,7 @@ function OrderCard({
 
   return (
     <View style={[styles.orderCard, isProgress && styles.activeOrderCard]}>
+      <Text style={styles.typeBadge}>Đơn nhờ đi chợ</Text>
       <View style={styles.orderTopRow}>
         <Text style={[styles.status, isProgress ? styles.shoppingStatus : styles.waitingStatus]}>
           {statusLabels[order.status]}
@@ -176,6 +181,8 @@ export default function OrdersScreen({ history = false }: { history?: boolean })
 function OrderList({ history, userId }: { history: boolean; userId: string }) {
   const router = useRouter();
   const scope = history ? 'history' : 'active';
+  const weeklyCustomer = useFoodResource<FoodOrder[]>('orders:customer', uid => getFoodOrders(uid, 'customer'));
+  const weeklyShopper = useFoodResource<FoodOrder[]>('orders:shopper', uid => getFoodOrders(uid, 'shopper'));
   const initial = orderListEntry(userId, scope).data;
   const [activeTab, setActiveTab] = useState<OrderTab>('customer');
   const [orders, setOrders] = useState<OrderSummary[]>(initial ?? []);
@@ -198,7 +205,7 @@ function OrderList({ history, userId }: { history: boolean; userId: string }) {
     } catch (loadError) {
       if (alive.current) setError(loadError instanceof Error ? loadError.message : 'Không thể tải đơn hàng lúc này.');
     } finally {
-      if (alive.current) { setLoading(false); setRefreshing(false); }
+      if (alive.current) { setLoading(false); }
     }
   }, [userId, scope]);
 
@@ -208,13 +215,17 @@ function OrderList({ history, userId }: { history: boolean; userId: string }) {
     setOrders(rows => rows.filter(order => order.id !== id));
   };
 
-  const scopedOrders = useMemo(
-    () => orders.filter(order => completedStatuses.includes(order.status) === history),
-    [orders, history],
-  );
-  const posted = scopedOrders.filter(order => order.role === 'customer');
-  const received = scopedOrders.filter(order => order.role === 'shopper');
+  const feed = useMemo(() => buildOrderFeed(orders, weeklyCustomer.data ?? [], weeklyShopper.data ?? [], history), [orders, weeklyCustomer.data, weeklyShopper.data, history]);
+  const posted = feed.filter(row => row.role === 'customer');
+  const received = feed.filter(row => row.role === 'shopper');
   const visibleOrders = activeTab === 'customer' ? posted : received;
+  const weekly = activeTab === 'customer' ? weeklyCustomer : weeklyShopper;
+  const initialLoading = visibleOrders.length === 0 && (loading || (weekly.data === undefined && weekly.fetching));
+  const refreshAll = async () => {
+    setRefreshing(true);
+    try { await Promise.allSettled([loadOrders(true), weeklyCustomer.refresh(true), weeklyShopper.refresh(true)]); }
+    finally { if (alive.current) setRefreshing(false); }
+  };
 
   return (
     <SafeAreaView style={styles.safeArea} edges={history ? ['top', 'bottom'] : ['top']}>
@@ -236,25 +247,26 @@ function OrderList({ history, userId }: { history: boolean; userId: string }) {
       </View>
 
       <ScrollView
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); void loadOrders(true); }} tintColor={colors.forest} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refreshAll()} tintColor={colors.forest} />}
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
       >
-        {!history && <Pressable accessibilityRole="button" onPress={() => router.push('/weekly-food/orders')} style={{ padding: 16, borderWidth: 1, borderColor: colors.border, borderRadius: 16, backgroundColor: colors.cream, marginBottom: 16 }}><Text style={{ fontFamily: fontFamilies.bodyBold, fontSize: fontSizes.body, lineHeight: lineHeights.body, color: colors.forest }}>Gói nguyên liệu tuần →</Text><Text style={{ fontFamily: fontFamilies.body, fontSize: fontSizes.bodySmall, lineHeight: lineHeights.bodySmall, color: colors.muted }}>Theo dõi gói đã đăng ký hoặc nhận giao gói Makko.</Text></Pressable>}
-        {loading ? <View style={styles.emptyState}><ActivityIndicator color={colors.coral} /><Text style={styles.emptyDescription}>Đang tải đơn hàng...</Text></View> : error && !loaded ? (
+
+        {initialLoading ? <View style={styles.emptyState}><ActivityIndicator color={colors.coral} /><Text style={styles.emptyDescription}>Đang tải đơn hàng...</Text></View> : error && !loaded && !visibleOrders.length ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyTitle}>Không thể tải đơn hàng</Text>
             <Text style={styles.emptyDescription}>{error}</Text>
             <Pressable accessibilityRole="button" onPress={() => void loadOrders(true)} style={({ pressed }) => [styles.retryButton, pressed && styles.pressed]}><Text style={styles.retryText}>Thử lại</Text></Pressable>
           </View>
-        ) : visibleOrders.length ? visibleOrders.map((order) => <OrderCard key={order.id} order={order} onDeleted={onDeleted} onConflict={() => void loadOrders(true)} />) : (
+        ) : visibleOrders.length ? visibleOrders.map(row => row.type === 'weekly' ? <WeeklyOrderCard key={`weekly:${row.role}:${row.order.id}`} order={row.order} role={row.role}/> : <OrderCard key={`errand:${row.role}:${row.order.id}`} order={row.order} onDeleted={onDeleted} onConflict={() => void loadOrders(true)} />) : (
           <View style={styles.emptyState}>
             <Text style={styles.emptyTitle}>{history ? (activeTab === 'customer' ? 'Chưa có lịch sử đơn đã đăng' : 'Chưa có lịch sử đơn đã nhận') : activeTab === 'customer' ? 'Chưa có đơn đã đăng' : 'Chưa có đơn đã nhận'}</Text>
-            <Text style={styles.emptyDescription}>{history ? (activeTab === 'customer' ? 'Các đơn bạn đăng đã hoàn tất hoặc đã hủy sẽ xuất hiện tại đây.' : 'Các đơn bạn nhận đi giúp đã hoàn tất hoặc đã hủy sẽ xuất hiện tại đây.') : activeTab === 'customer' ? 'Các yêu cầu bạn đăng sẽ xuất hiện tại đây.' : 'Các yêu cầu bạn nhận đi giúp sẽ xuất hiện tại đây.'}</Text>
+            <Text style={styles.emptyDescription}>{history ? (activeTab === 'customer' ? 'Các đơn bạn đăng đã hoàn tất hoặc đã hủy sẽ xuất hiện tại đây.' : 'Các đơn bạn nhận đi giúp đã hoàn tất hoặc đã hủy sẽ xuất hiện tại đây.') : activeTab === 'customer' ? 'Các đơn nhờ đi chợ và gói nguyên liệu bạn đăng ký sẽ xuất hiện tại đây.' : 'Các đơn nhờ đi chợ và gói nguyên liệu bạn nhận giao sẽ xuất hiện tại đây.'}</Text>
           </View>
         )}
 
-        {error && loaded && <Text accessibilityRole="alert" style={styles.deleteText}>{error} Kéo xuống để thử lại.</Text>}
+        {weekly.error && <Text accessibilityRole="alert" style={styles.deleteText}>{weekly.error} Kéo xuống để thử lại.</Text>}
+        {error && (loaded || visibleOrders.length > 0) && <Text accessibilityRole="alert" style={styles.deleteText}>{error} Kéo xuống để thử lại.</Text>}
         {!history && <Pressable accessibilityRole="button" onPress={() => router.push('/account/order-history')} style={styles.communityBanner}>
           <Text style={styles.emptyDescription}>Đơn đã hoàn tất và đã hủy nằm trong Tài khoản → Lịch sử đơn hàng.</Text>
         </Pressable>}
@@ -265,6 +277,7 @@ function OrderList({ history, userId }: { history: boolean; userId: string }) {
 }
 
 const styles = StyleSheet.create({
+  typeBadge: { alignSelf: 'flex-start', backgroundColor: colors.chip, color: colors.forest, borderRadius: 7, paddingVertical: 5, paddingHorizontal: 8, fontFamily: fontFamilies.bodyBold, fontSize: fontSizes.caption, lineHeight: lineHeights.caption },
   safeArea: { backgroundColor: colors.background, flex: 1 },
   header: {
     alignItems: 'center',

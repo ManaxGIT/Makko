@@ -38,3 +38,13 @@ export function packageIngredients<T extends { name: string; quantity: string }>
         return { ...ingredient, quantity: `${format.format(scaled)} ${unit}` };
     });
 }
+
+export function weekRange(weekStart: string) {
+    const start = Date.parse(weekStart + 'T00:00:00+07:00');
+    return `${day(start)} – ${day(start + 6 * 86400000)}`;
+}
+export function selectedFoodWeek<T extends { id: string; deliveryDeadline: string }>(weeks: T[], selectedId?: string, now = Date.now()): T | undefined {
+    // Once explicitly selected, a missing/expired week must not silently turn
+    // into a registration for a different week during refresh.
+    return weeks.find(week => cutoff(week) >= now && (selectedId === undefined || week.id === selectedId));
+}

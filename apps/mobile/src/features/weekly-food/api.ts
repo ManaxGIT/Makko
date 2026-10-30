@@ -36,6 +36,7 @@ export type FoodDetail = FoodOrder & {
 };
 export type AvailableFood = Pick<FoodOrder, 'id' | 'people' | 'meals' | 'price' | 'deliveryDeadline' | 'createdAt'> & {
     wage: number;
+    week: FoodWeek;
 };
 export const getWeeks = (userId: string) => apiGet<FoodWeek[]>('/api/v1/weekly-food/weeks', undefined, userId);
 export const getFoodDetail = (id: string, userId: string) => apiGet<FoodDetail>(`/api/v1/weekly-food/orders/${encodeURIComponent(id)}`, undefined, userId);

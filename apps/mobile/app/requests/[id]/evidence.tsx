@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import { ActivityIndicator, BackHandler, Image, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, BackHandler, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Redirect, Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SymbolView } from 'expo-symbols';
@@ -7,6 +7,7 @@ import type { ImagePickerOptions } from 'expo-image-picker';
 import { requireOptionalNativeModule } from 'expo';
 import { useAuth } from '@/features/auth/AuthProvider';
 import { getOrderDetail, OrderDetail } from '@/features/orders/api';
+import { EvidencePhotoPicker, EvidencePhotoStrip } from '@/features/orders/EvidencePhotoInput';
 import { evidenceBucket, EvidencePhoto, submitEvidence, submitDeliveryEvidence } from '@/features/orders/evidence';
 import { supabase } from '@/lib/supabase';
 import { colors } from '@/theme/colors';
@@ -132,15 +133,15 @@ export default function PurchaseEvidenceScreen() {
         </>}
         {!delivery && step === 1 && <>
           <Text style={s.description}>Thêm ít nhất một ảnh rõ các món đã mua. Hóa đơn không bắt buộc, không cần nhập giá thực mua.</Text>
-          <View style={s.upload}><Text style={s.bold}>Ảnh hàng đã mua</Text><Text style={s.description}>Chụp chung cả giỏ hoặc thêm nhiều ảnh.</Text><View style={s.row}><Pressable disabled={busy} style={s.secondary} onPress={() => pick(true, 'goods')}><Text style={s.action}>Chụp ảnh</Text></Pressable><Pressable disabled={busy} style={s.secondary} onPress={() => pick(false, 'goods')}><Text style={s.action}>Chọn ảnh</Text></Pressable></View></View>
+          <EvidencePhotoPicker title="Ảnh hàng đã mua" description="Chụp chung cả giỏ hoặc thêm nhiều ảnh." disabled={busy} onPick={camera => void pick(camera, 'goods')}/>
         </>}
         {!delivery && step === 2 && order.items.map(item => <View key={item.id} style={s.card}><Text style={s.body}>✓ {item.name} · {item.quantity} {item.unit}</Text></View>)}
-        {!delivery && step > 0 && <>{(['goods', 'receipt'] as const).map(kind => <View key={kind}><Text style={s.bold}>{kind === 'goods' ? 'Ảnh hàng đã mua' : 'Hóa đơn · Không bắt buộc'}</Text><View style={s.photos}>{photos.filter(p => p.kind === kind).map(photo => <View key={photo.key}><Image source={{ uri: photo.uri }} style={s.photo} />{step === 1 && <Pressable disabled={busy} accessibilityLabel="Xóa ảnh đã chọn" style={s.remove} onPress={() => setPhotos(old => old.filter(p => p.key !== photo.key))}><Text style={s.bold}>×</Text></Pressable>}</View>)}</View>{step === 1 && kind === 'receipt' && <Pressable disabled={busy} style={s.secondary} onPress={() => pick(false, 'receipt')}><Text style={s.action}>＋ Thêm ảnh hóa đơn</Text></Pressable>}</View>)}</>}
+        {!delivery && step > 0 && <>{(['goods', 'receipt'] as const).map(kind => <View key={kind}><Text style={s.bold}>{kind === 'goods' ? 'Ảnh hàng đã mua' : 'Hóa đơn · Không bắt buộc'}</Text><EvidencePhotoStrip photos={photos.filter(p => p.kind === kind)} disabled={busy} onRemove={step === 1 ? key => setPhotos(old => old.filter(p => p.key !== key)) : undefined}/>{step === 1 && kind === 'receipt' && <Pressable disabled={busy} style={s.secondary} onPress={() => pick(false, 'receipt')}><Text style={s.action}>＋ Thêm ảnh hóa đơn</Text></Pressable>}</View>)}</>}
         {!delivery && (step === 0 || step === 2) && <View style={s.card}><View style={s.totalRow}><Text style={s.body}>Tiền hàng đã thỏa thuận</Text><Text style={s.bold}>{money(order.estimatedItemsTotal ?? 0)}</Text></View><View style={s.totalRow}><Text style={s.body}>Phí đi chợ</Text><Text style={s.bold}>{money(order.deliveryFee)}</Text></View><Text style={s.description}>Tổng tiền giữ nguyên khi mua đủ, đúng yêu cầu.</Text></View>}
         {delivery && <>
           <Text style={s.description}>Thêm ít nhất một ảnh thể hiện hàng đã được giao tại nơi nhận.</Text>
-          <View style={s.upload}><Text style={s.bold}>Ảnh giao hàng</Text><Text style={s.description}>Chụp rõ hàng tại nơi giao. Không cần chụp khuôn mặt người nhận.</Text><View style={s.row}><Pressable disabled={busy} style={s.secondary} onPress={() => pick(true, 'delivery')}><Text style={s.action}>Chụp ảnh</Text></Pressable><Pressable disabled={busy} style={s.secondary} onPress={() => pick(false, 'delivery')}><Text style={s.action}>Chọn từ thư viện</Text></Pressable></View></View>
-          <View style={s.photos}>{photos.map(photo => <View key={photo.key}><Image accessibilityLabel="Ảnh giao hàng đã chọn" source={{ uri: photo.uri }} style={s.photo} /><Pressable disabled={busy} accessibilityRole="button" accessibilityLabel="Xóa ảnh giao hàng" style={s.remove} onPress={() => setPhotos(old => old.filter(p => p.key !== photo.key))}><Text style={s.bold}>×</Text></Pressable></View>)}</View>
+          <EvidencePhotoPicker title="Ảnh giao hàng" description="Chụp rõ hàng tại nơi giao. Không cần chụp khuôn mặt người nhận." disabled={busy} onPick={camera => void pick(camera, 'delivery')} libraryLabel="Chọn từ thư viện"/>
+          <EvidencePhotoStrip photos={photos} disabled={busy} onRemove={key => setPhotos(old => old.filter(p => p.key !== key))} imageLabel="Ảnh giao hàng đã chọn" removeLabel="Xóa ảnh giao hàng"/>
           <Text style={s.small}>{photos.length ? `${photos.length} ảnh giao hàng` : 'Chưa có ảnh'}</Text>
           <Text style={s.tip}>Ảnh giao hàng được lưu riêng với ảnh mua hàng và hóa đơn. Sau khi bạn xác nhận đã giao, đơn vẫn chờ người đăng xác nhận đã nhận hàng.</Text>
         </>}
@@ -165,8 +166,6 @@ const s = StyleSheet.create({
   row: { flexDirection: 'row', gap: 10, flexWrap: 'wrap' }, totalRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' },
   tip: { backgroundColor: colors.cream, padding: 16, borderRadius: 14, fontFamily: fontFamilies.body, fontSize: fontSizes.bodySmall, lineHeight: lineHeights.bodySmall, color: colors.brown },
   secondary: { borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 12, minHeight: 44, backgroundColor: colors.surface }, action: { fontFamily: fontFamilies.bodyBold, fontSize: fontSizes.bodySmall, color: colors.coral },
-  upload: { backgroundColor: colors.cream, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.orange, padding: 20, borderRadius: 16 },
-  photos: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginVertical: 12 }, photo: { width: 96, height: 96, borderRadius: 12 }, remove: { position: 'absolute', top: 0, right: 0, width: 32, height: 32, backgroundColor: colors.cream, alignItems: 'center', justifyContent: 'center', borderRadius: 16 },
   footer: { padding: 16, gap: 12, borderTopWidth: 1, borderColor: colors.border }, total: { fontFamily: fontFamilies.bodyBold, fontSize: fontSizes.bodyLarge, color: colors.coral },
   primary: { backgroundColor: colors.orange, borderRadius: 14, padding: 16, alignItems: 'center', minHeight: 50 }, primaryText: { fontFamily: fontFamilies.bodyBold, fontSize: fontSizes.bodySmall, color: colors.forest },
   error: { fontFamily: fontFamilies.body, fontSize: fontSizes.bodySmall, color: colors.coral },
