@@ -368,3 +368,72 @@ Migration `20261023132806_saved_address_management.sql`; kiểm tra rollback v�
 - `POST /api/v1/orders/{id}/goods-agreement/{proposalId}/response`, body `{ "accept": true }` (hoặc `false`): chỉ người đi chợ đang nhận đơn được đồng ý/từ chối mức tiền cụ thể đó.
 
 Các thao tác chạy qua RPC với JWT người dùng và khóa cùng dòng đơn với chuyển trạng thái/hủy nhận đơn. `accepted → shopping` giữ đề nghị chờ; rời hai giai đoạn này làm đề nghị hết hiệu lực. Đề nghị gắn với lượt nhận đơn để người nhận sau không dùng lại xác nhận cũ. Phí đi chợ và chi phí mua thực tế không bị sửa. Các lần gửi/xác nhận giống hệt khi đề nghị chưa thay đổi không tạo thêm bản ghi hoặc sửa quyết định đã chốt.
+
+## Admin web and weekly food
+
+The admin client is in `../admin`; see its README for local URLs and membership
+provisioning. It reuses this API and requires an active `admin_memberships` row.
+
+- `GET /api/v1/admin/me`: check current admin membership.
+- `GET /api/v1/admin/orders`: paginated combined list, `order_type`,
+  `status_filter`, `search_query`, `work_queue`, `page_limit`, `page_offset`.
+- `GET /api/v1/admin/orders/{weekly|errand}/{id}`: administrative details.
+- `POST /api/v1/admin/weekly-orders/{id}/handover`: confirm full advance and
+  handing ingredients to the current shopper, atomically.
+- `POST /api/v1/admin/weekly-orders/{id}/pay-wage`: record 25,000 VND paid after
+  customer receipt; duplicates are rejected rather than recorded twice.
+- `POST /api/v1/admin/weekly-weeks`: publish package ingredients. Body has `weekStart`
+  (Monday) and a flat `ingredients` array (1–350 entries with `name`, `quantity`).
+  No days or dishes are accepted. Publish at least ten days before delivery.
+
+Authenticated weekly-food endpoints:
+
+- `GET /api/v1/weekly-food/weeks`: upcoming published packages with a flat `ingredients` array.
+- `POST /api/v1/weekly-food/orders`: `weekId`, own saved `addressId`, `people`
+  (1–4), `meals` (`lunch`, `dinner`, `both`), UUID `submissionKey` for retries.
+  SQL calculates the fixed price and snapshots the address; only one-week cash
+  packages are supported. No amount or customer ID is accepted from the client.
+- `GET /api/v1/weekly-food/orders?role=customer|shopper`: own orders, paginated.
+- `GET /api/v1/weekly-food/available`: available deliveries, excluding self-orders
+  and any order the caller previously released; no recipient details are exposed.
+- `GET /api/v1/weekly-food/orders/{id}`: only customer or current shopper.
+- `POST /api/v1/weekly-food/orders/{id}/{cancel|accept|release|deliver|receive}`:
+  body `{}` except deliver requires `photoPaths`. Admin actions are not accepted
+  by this route. SQL serializes assignment, cancellation, release and receipt.
+
+The Sunday deadline is the end of Sunday in `Asia/Ho_Chi_Minh`, immediately before
+Monday's consumption week. Register/cancel by seven days before that deadline;
+shopper acceptance opens afterwards. Release requires <=24 hours from acceptance
+and >=72 hours before the deadline, before Makko hands over goods/collects advance.
+A released shopper can never accept that order again. Delivery has separate
+shopper and customer confirmations; wages are payable only after the latter.
+
+Delivery evidence uploads go directly to the private `weekly-food-delivery`
+Storage bucket at `<shopper-id>/<order-id>/<unique-file-name>`, JPEG/PNG/WebP,
+max 10 MB. Upload policy checks the current assignment and delivering status;
+clients cannot overwrite/delete objects. The deliver RPC checks stored object
+ownership and records evidence with the transition in one transaction.
+
+The Expo weekly-food flow uses this API for registration, delivery acceptance
+and tracking. The HTML prototype remains a standalone demo. No demonstration
+menu or weekly order is inserted into the connected database.
+
+Security verification: `tests/unit/test_admin.py` covers HTTP authorization and
+RPC forwarding. `tests/integration/sql/admin_weekly.sql` exercises membership,
+revocation, price/idempotency, address snapshots, cancellation, release, handover,
+photo requirements and wage guards, then rolls back all fixtures. It requires
+an explicitly provisioned admin and a second active profile in the test project;
+the script selects an active provisioned admin and rolls back its temporary revocation.
+
+RLS on admin/weekly tables intentionally has no direct-client policies: all
+feature reads pass through FastAPI and writes through checked RPCs. Advisor
+notices for these deny-by-default tables and authenticated SECURITY DEFINER
+RPCs are expected; every new RPC fixes `search_path`, revokes PUBLIC/anon execution,
+and checks the authenticated actor. Existing project Auth advisor settings are
+not changed by this implementation.
+
+Weekly ingredient storage retains the existing `weekly_food_weeks.menu` JSONB
+column and RPC `week_menu` argument for SQL compatibility. Their content is now a
+flat list of `{name, quantity}` objects, exposed as `ingredients` by the API.
+Migration `20261030175652_weekly_package_ingredients.sql` converts existing daily
+menus to summed ingredients without changing week/order IDs, dates or prices.

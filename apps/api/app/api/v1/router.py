@@ -1,8 +1,10 @@
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import addresses, explore, home, locations, meals, orders
+from app.api.v1.endpoints import addresses, admin, explore, home, locations, meals, orders, weekly_food
 
 router = APIRouter(prefix="/api/v1")
+router.include_router(admin.router)
+router.include_router(weekly_food.router)
 router.include_router(explore.router)
 router.include_router(home.router)
 router.include_router(orders.router)

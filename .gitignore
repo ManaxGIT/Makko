@@ -34,3 +34,6 @@ supabase/.temp/
 # Project documentation kept locally
 docs/
 developer-notes.md
+
+# Generated artifacts
+/output/
