@@ -200,3 +200,55 @@ thao tác xác nhận cập nhật cache, pull-to-refresh giữ nội dung và l
 thử lại. Đăng xuất/đổi tài khoản xóa cache và bỏ qua phản hồi cũ. Tạo địa chỉ vẫn
 trả một bản ghi theo API cũ, nên cập nhật cục bộ rồi đánh dấu stale để tải metadata
 đầy đủ lần đọc kế tiếp. Không tự gửi lại thao tác lưu khi kết quả mạng chưa rõ.
+
+## Weekly ingredient packages
+
+The home entry opens `/weekly-food`. The flow includes package selection (1–4
+people; lunch, dinner, both), the published package ingredients, `/weekly-food/checkout`
+using the existing saved-address popup, `/weekly-food/orders` for customer,
+assigned-shopper and available-delivery lists, and `/weekly-food/[id]` for tracking.
+The Orders tab also links to the weekly list. Every weekly route is session-guarded.
+
+Reads/writes use `/api/v1/weekly-food` on FastAPI with the current account ID
+checked by the shared HTTP client. Only the one-week cash plan is enabled. The
+app automatically uses the earliest published week whose seven-day registration
+cutoff has not passed; users select no delivery day or time. An empty catalogue
+shows that registrations are not open, rather than introducing a demo ingredient list.
+Publish real ingredient lists with the admin web/API before testing registrations against live data.
+
+The checkout reuses account addresses and validates Da Nang. A deleted selection
+requires an explicit replacement. Retried submissions with the same selections
+reuse the draft submission key. The server owns prices, cutoff checks and all
+state transitions. Long-term plans remain unavailable until online payment exists.
+
+Tracking refreshes every 15 seconds while focused and foregrounded, retaining
+content during refresh/errors. Weekly resources reuse the account-scoped,
+versioned order cache lifecycle and are cleared on logout. Confirmed mutations
+patch known status values, retain server timestamps and invalidate affected reads.
+
+Shopper delivery requires at least one image before “Đã giao hàng & thu tiền”.
+Images upload to the explicitly designed private `weekly-food-delivery` Storage
+flow; completion still requires a separate customer receipt confirmation. Makko
+advance/handover and wage payments remain on the admin web. The fixed pickup
+address is not configured yet. Weekly-package ratings have no backend endpoint
+and are not submitted by these screens; existing shopping-request ratings remain
+unchanged.
+
+Run `npm run typecheck`, `node --test tests/*.test.cjs`, and `npx expo export --platform all` for checks.
+Native bundles and web static export can be produced without Google API calls.
+
+Weekly package quantities are published for one person, one meal/day, seven days.
+The ingredient sheet multiplies by selected people and by two for both meals.
+Saved-order sheets use the order's people/meal choices, including the shopper view.
+Free-form legacy quantities show the original text and multiplier instead of an
+invented numeric amount; publication should use numeric amounts with units.
+
+Explore now separates **Đơn nhờ đi chợ** and **Gói nguyên liệu** with tabs and
+explicit card labels. Weekly delivery is accepted directly in Explore through
+the existing weekly `accept` API, then opens the assigned order. Weekly results
+cover Da Nang and do not use the errand keyword/location filters. The two lists
+keep their own scroll areas and state; pull-to-refresh applies to the visible
+list. Weekly pages reuse the existing account-scoped `available:<page>` cache
+(30-second freshness, 25 rows/page), shared with the weekly-orders screen. Server
+ownership, cutoff and assignment checks remain authoritative. The weekly-order
+card component is shared by both entry points; no sample orders are inserted.

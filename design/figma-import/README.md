@@ -86,3 +86,36 @@ Mở tại `http://127.0.0.1:4173/saved-addresses.html`; ảnh duyệt ở
 Popup có nút đóng, chạm nền để đóng và chỉ áp dụng địa chỉ khi xác nhận.
 Thiết kế đã được duyệt và được triển khai trong mobile/API; trang này vẫn chỉ
 là prototype dữ liệu mẫu để tham chiếu, không kết nối tài khoản thật.
+
+## Gói nguyên liệu tuần — bản mẫu để duyệt
+
+`weekly-food.html` gồm năm khung: trang chủ đã duyệt, chọn gói, đăng ký, theo dõi và nhận giao. Có nút chuyển nhanh giữa các khung.
+Chạy server từ gốc repository rồi mở
+`http://127.0.0.1:4173/design/figma-import/weekly-food.html`.
+Chọn số người/bữa ăn, xem thực đơn và xác nhận đăng ký; dùng “Thời điểm minh họa”
+để đi qua hạn hủy, mở nhận giao và đến ngày giao. Phần điều khiển phía Makko
+ở cuối trang mô phỏng thu tiền ứng/bàn giao và trả công sau xác nhận của khách.
+Ảnh bàn giao chỉ được chọn cục bộ, không tải lên. Font được đóng gói cục bộ.
+
+Bản mẫu minh họa một đơn mỗi lần; “Làm lại bản mẫu” khôi phục dữ liệu ban đầu.
+Sản phẩm dự kiến cho phép nhiều gói. Bản mẫu nhúng trực tiếp popup và form
+trong `saved-addresses.html?embedded-picker=1`: chọn, đóng bỏ lựa chọn tạm,
+xác nhận hoặc thêm địa chỉ. Chọn địa chỉ chỉ áp dụng cho gói, không đổi mặc định.
+Trang chủ dùng `home-weekly-food.html?embed=1` để giữ cùng thiết kế đã duyệt.
+Giao sớm nhất có thể, chậm nhất Chủ nhật; khách không chọn ngày hoặc giờ.
+Mốc đăng ký và hủy tính theo Chủ nhật hạn chót (mẫu 15/11 cho tuần 16–22/11). Các mốc hủy hiển thị
+theo ngày; mốc 00:00 trong mã chỉ phục vụ mô phỏng, chưa phải quyết định về
+giờ chốt hạn sau khi bỏ khung giờ giao. Thực đơn, định lượng và ngày tháng là dữ liệu mẫu;
+địa chỉ điểm nhận hàng Makko chưa được thiết lập. Chỉ mở kỳ hạn một tuần,
+thanh toán tiền mặt; chưa có dữ liệu bền vững, API, thanh toán thật hoặc mã mobile.
+
+## Web quản lý Makko — bản mẫu
+
+Mở `makko-admin.html` để xem danh sách chung cho gói nguyên liệu tuần và đơn
+nhờ đi chợ. Có tìm kiếm, lọc loại đơn/trạng thái, chi tiết đơn, hàng chờ bàn giao
+và hàng chờ trả công. Chọn GT-0018 để thử xác nhận thu tiền ứng/bàn giao;
+GT-0017 để thử trả công sau khi khách đã nhận. Đơn nhờ đi chợ chỉ theo dõi,
+không thay người dùng xác nhận trạng thái.
+
+Dữ liệu mẫu độc lập với `weekly-food.html`, chỉ lưu trong phiên trang; tải lại
+hoặc khôi phục sẽ đặt lại. Chưa có đăng nhập quản trị, API hoặc thao tác tiền thật.

@@ -119,6 +119,41 @@ and the corresponding Supabase provider/configuration have been verified.
   database trigger/profile behavior, and a real device or simulator flow before
   describing authentication as working end-to-end.
 
+## Administration web
+
+- The approved admin web lives in `apps/admin` (React, TypeScript, Vite). It shares
+  the existing FastAPI application and Supabase project with mobile; feature data
+  must go through FastAPI, while its Supabase client is used only for Auth.
+- Admin access is provisioned manually through `admin_memberships`, never through
+  user-editable metadata or a customer-facing role editor. Verify active membership
+  on every admin request and in privileged write RPCs. Never grant a new account
+  access without explicit user authorization.
+- Admins may inspect shopping requests but must not replace customer/shopper
+  delivery confirmations. Weekly-package advance/handover and wage confirmation
+  are admin operations serialized in database RPCs.
+
+## Weekly ingredient packages
+
+- User decision (2026-10-31): both admin and mobile use a flat list of ingredients
+  and quantities for each weekly package. Do not restore dishes, lunch/dinner
+  menus, or weekday sections. Keep week-start/delivery dates for registration
+  scheduling and retain the customer's people/meal choices.
+- API publication and responses use `ingredients`. The existing SQL storage
+  column `weekly_food_weeks.menu` and RPC argument `week_menu` retain their names
+  for compatibility but now contain flat `{name, quantity}` entries. Existing
+  published daily menus were migrated to summed ingredient lists.
+
+- User decision (2026-10-31): published ingredient quantities are the base for
+  one person, one meal per day, for seven days. Multiply by the selected people
+  count and by two for `both`; lunch-only and dinner-only use the same list and
+  quantities. Apply this both before registration and when viewing a saved order
+  (including the assigned shopper), using that order's saved selections.
+
+- User decision (2026-10-31): users can accept weekly-package delivery directly
+  from Explore. Distinguish errand requests and weekly packages with explicit
+  type labels; reuse the existing atomic weekly acceptance API and eligibility
+  rules. The separate weekly-order management screen remains available.
+
 ## Personal profile
 
 - User decision (2026-10-24): personal profile editing includes display name,
