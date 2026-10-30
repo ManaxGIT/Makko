@@ -119,3 +119,18 @@ không thay người dùng xác nhận trạng thái.
 
 Dữ liệu mẫu độc lập với `weekly-food.html`, chỉ lưu trong phiên trang; tải lại
 hoặc khôi phục sẽ đặt lại. Chưa có đăng nhập quản trị, API hoặc thao tác tiền thật.
+
+`weekly-delivery-review.html` minh họa hai thay đổi: gói nguyên liệu nằm chung
+trong Đơn đã đăng/Đơn đã nhận với nhãn loại riêng, và phần xem nguyên liệu, tiền
+ứng, tiền công trước nút xác nhận nhận giao. Đây là dữ liệu mẫu, không ghi đơn
+thật. Các luồng tương ứng đã được triển khai trong mobile; phần chân xác nhận
+được giữ ngoài vùng cuộn để người dùng chủ động xác nhận sau khi xem.
+
+`weekly-week-selection.html` minh họa chọn giữa nhiều tuần đã công bố, xem đúng
+nguyên liệu và hạn đăng ký của từng tuần. Tuần khóa vẫn xem được nhưng không
+đăng ký được. Có tuần minh họa thêm để duyệt thiết kế; không tạo dữ liệu thật.
+
+`admin-weekly-packages.html` previews the approved admin published-package list,
+ingredient details and deletion confirmation. It uses illustrative data only;
+packages with any order have deletion disabled. The implemented version lives
+in `apps/admin/src/WeeklyPackageList.tsx` and uses FastAPI, not mock writes.
